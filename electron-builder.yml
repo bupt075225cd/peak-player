@@ -1,0 +1,25 @@
+appId: com.peakplayer.app
+productName: Peak Player
+directories:
+  buildResources: resources
+  output: release
+files:
+  - out/**/*
+  - resources/**/*
+  - package.json
+asarUnpack:
+  - node_modules/better-sqlite3/**
+npmRebuild: true
+win:
+  target:
+    - nsis
+  icon: resources/icon.png
+mac:
+  target:
+    - dmg
+  category: public.app-category.music
+linux:
+  target:
+    - AppImage
+  category: Audio
+  icon: resources/icon.png

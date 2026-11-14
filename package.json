@@ -1,0 +1,37 @@
+{
+  "name": "peak-player",
+  "version": "0.1.0",
+  "description": "Peak Player - 离线音频播放器",
+  "main": "./out/main/index.js",
+  "author": "Peak Player",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "postinstall": "electron-builder install-app-deps",
+    "package:win": "electron-vite build && electron-builder --win",
+    "package:mac": "electron-vite build && electron-builder --mac",
+    "package:linux": "electron-vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.14.12",
+    "@vitejs/plugin-vue": "^5.1.2",
+    "echarts": "^5.5.0",
+    "electron": "^31.3.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "pinia": "^2.2.2",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.5",
+    "vue": "^3.4.35",
+    "vue-tsc": "^2.0.29"
+  }
+}
