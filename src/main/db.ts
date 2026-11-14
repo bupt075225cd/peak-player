@@ -3,19 +3,22 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import type { DailyUsage, RankingBy, Track } from '../shared/types'
 
-let db: Database.Database
+let db: Database.Database | undefined
 
-function pad(n: number): string {
+export function pad(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-function localDate(d: Date): string {
+export function localDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-export function initDb(): void {
-  db = new Database(join(app.getPath('userData'), 'peak-player.db'))
-  db.pragma('journal_mode = WAL')
+// dbPath 可注入：生产用 userData，测试用 ':memory:' 或临时文件
+export function initDb(dbPath?: string): void {
+  db?.close()
+  const p = dbPath ?? join(app.getPath('userData'), 'peak-player.db')
+  db = new Database(p)
+  if (p !== ':memory:') db.pragma('journal_mode = WAL')
   db.exec(`
     CREATE TABLE IF NOT EXISTS tracks (
       id            TEXT PRIMARY KEY,
@@ -34,7 +37,7 @@ export function initDb(): void {
 
 function getDb(): Database.Database {
   if (!db) initDb()
-  return db
+  return db!
 }
 
 // ---- 歌曲 ----

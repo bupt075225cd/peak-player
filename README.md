@@ -80,6 +80,25 @@ npm run package:mac     # macOS (dmg)
 npm run package:linux   # Linux (AppImage)
 ```
 
+## 单元测试
+
+使用 Vitest 编写单元测试，覆盖核心业务逻辑：
+
+- `src/main/db.test.ts` — 数据库操作（增删改查、计数、用时、排行、周统计）
+- `src/main/source.test.ts` — 音源抽象层
+- `src/shared/track-url.test.ts` — 音源 URL 解析
+
+```bash
+# 运行测试
+npm test
+
+# 监听模式
+npm run test:watch
+```
+
+> 说明：better-sqlite3 以 electron ABI 编译，测试通过 `scripts/run-tests.mjs`
+> 以 `ELECTRON_RUN_AS_NODE=1` 方式运行，确保原生模块 ABI 与运行时一致。
+
 ## 架构说明
 
 ### 进程模型

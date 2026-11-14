@@ -12,6 +12,8 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "test": "node scripts/run-tests.mjs",
+    "test:watch": "node scripts/run-tests.mjs --watch",
     "postinstall": "electron-builder install-app-deps",
     "package:win": "electron-vite build && electron-builder --win",
     "package:mac": "electron-vite build && electron-builder --mac",
@@ -31,6 +33,7 @@
     "pinia": "^2.2.2",
     "typescript": "^5.5.4",
     "vite": "^5.3.5",
+    "vitest": "^2.1.9",
     "vue": "^3.4.35",
     "vue-tsc": "^2.0.29"
   }
