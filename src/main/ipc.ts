@@ -14,7 +14,8 @@ import {
 } from './db'
 import { getMainWindow } from './window'
 
-const AUDIO_EXTS = new Set(['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus', '.wma'])
+// 仅保留 Chromium 内置可解码的格式；.wma 无解码器，导入后无法播放
+const AUDIO_EXTS = new Set(['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus'])
 
 export function registerIpc(): void {
   ipcMain.handle('tracks:import', async (): Promise<Track[]> => {
@@ -23,7 +24,7 @@ export function registerIpc(): void {
       title: '选择音频文件',
       properties: ['openFile', 'multiSelections'],
       filters: [
-        { name: '音频文件', extensions: ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus', 'wma'] }
+        { name: '音频文件', extensions: ['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus'] }
       ]
     })
     if (result.canceled) return listTracks()
