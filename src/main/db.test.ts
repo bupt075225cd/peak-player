@@ -60,6 +60,12 @@ describe('updateTrack / incrementCount', () => {
     incrementCount('1', 2)
     expect(listTracks()[0].playCount).toBe(6)
   })
+
+  it('incrementCount 返回自增后的最新次数', () => {
+    addTracks([makeTrack({ id: '1', playCount: 3 })])
+    expect(incrementCount('1', 1)).toBe(4)
+    expect(incrementCount('1', 2)).toBe(6)
+  })
 })
 
 describe('addUsage / getWeeklyUsage', () => {

@@ -51,7 +51,7 @@ export function registerIpc(): void {
     (_e, id: string, patch: Partial<Pick<Track, 'playCount'>>): void => updateTrack(id, patch)
   )
 
-  ipcMain.handle('tracks:increment', (_e, id: string, delta: number): void =>
+  ipcMain.handle('tracks:increment', (_e, id: string, delta: number): number =>
     incrementCount(id, delta)
   )
 

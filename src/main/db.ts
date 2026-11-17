@@ -79,8 +79,12 @@ export function updateTrack(id: string, patch: Partial<Pick<Track, 'playCount'>>
     .run(...values)
 }
 
-export function incrementCount(id: string, delta: number): void {
-  getDb().prepare('UPDATE tracks SET play_count = play_count + ? WHERE id = ?').run(delta, id)
+// 返回自增后的最新次数，供渲染进程直接同步 UI
+export function incrementCount(id: string, delta: number): number {
+  const row = getDb()
+    .prepare('UPDATE tracks SET play_count = play_count + ? WHERE id = ? RETURNING play_count')
+    .get(delta, id) as { play_count: number } | undefined
+  return row?.play_count ?? 0
 }
 
 export function addTrackSeconds(id: string, seconds: number): void {

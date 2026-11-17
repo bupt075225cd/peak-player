@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { resolveTrackUrl } from '../../../shared/track-url'
 import type { LoopMode, Track } from '../../../shared/types'
+import { useLibraryStore } from '../stores/library'
 
 export type { LoopMode }
 
@@ -88,10 +89,14 @@ class PlayerEngine {
 
   // 完成一次播放：计数 +1；单曲循环则重播（不用 audio.loop，否则不触发 ended）
   private onEnded(): void {
-    if (playerState.current) {
-      const next = playerState.current.playCount + 1
-      window.api.incrementCount(playerState.current.id, 1)
-      playerState.current = { ...playerState.current, playCount: next }
+    const cur = playerState.current
+    if (cur) {
+      const id = cur.id
+      // 以主进程返回的最新次数为准，同时同步音乐库列表，避免界面停留在旧值
+      void window.api.incrementCount(id, 1).then((count) => {
+        if (playerState.current?.id === id) playerState.current.playCount = count
+        useLibraryStore().syncPlayCount(id, count)
+      })
     }
     if (this.loopMode === 'single') {
       this.audio.currentTime = 0

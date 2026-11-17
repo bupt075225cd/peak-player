@@ -6,7 +6,7 @@ const api = {
   listTracks: (): Promise<Track[]> => ipcRenderer.invoke('tracks:list'),
   updateTrack: (id: string, patch: Partial<Pick<Track, 'playCount'>>): Promise<void> =>
     ipcRenderer.invoke('tracks:update', id, patch),
-  incrementCount: (id: string, delta: number): Promise<void> =>
+  incrementCount: (id: string, delta: number): Promise<number> =>
     ipcRenderer.invoke('tracks:increment', id, delta),
   addUsage: (seconds: number, trackId: string | null): Promise<void> =>
     ipcRenderer.invoke('usage:add', seconds, trackId),

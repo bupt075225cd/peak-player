@@ -21,8 +21,14 @@ export const useLibraryStore = defineStore('library', () => {
 
   async function setPlayCount(id: string, count: number): Promise<void> {
     await window.api.updateTrack(id, { playCount: count })
-    await refresh()
+    syncPlayCount(id, count)
   }
 
-  return { tracks, loading, refresh, importFiles, setPlayCount }
+  // 播放结束后由 player 调用：只改动对应行，避免整表重查导致当前播放状态丢失
+  function syncPlayCount(id: string, count: number): void {
+    const target = tracks.value.find((t) => t.id === id)
+    if (target) target.playCount = count
+  }
+
+  return { tracks, loading, refresh, importFiles, setPlayCount, syncPlayCount }
 })
