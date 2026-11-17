@@ -5,3 +5,6 @@ release/
 *.log
 .DS_Store
 *.local
+
+# 打包用的 ffmpeg 二进制，由 scripts/fetch-ffmpeg.mjs 按需下载
+resources/bin/

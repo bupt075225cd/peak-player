@@ -6,10 +6,15 @@ directories:
 files:
   - out/**/*
   - resources/**/*
+  - '!resources/bin/**'
   - package.json
 asarUnpack:
   - node_modules/better-sqlite3/**
 npmRebuild: true
+# ffmpeg 需以真实文件形式落盘（asar 内的二进制无法 spawn）
+extraResources:
+  - from: resources/bin
+    to: bin
 win:
   target:
     - nsis
