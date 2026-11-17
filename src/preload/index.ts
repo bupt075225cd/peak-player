@@ -1,5 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { DailyUsage, RankingBy, Track } from '../shared/types'
+import type {
+  DailyUsage,
+  RankingBy,
+  Track,
+  VariantProgress,
+  VariantResult
+} from '../shared/types'
 
 const api = {
   importFiles: (): Promise<Track[]> => ipcRenderer.invoke('tracks:import'),
@@ -13,6 +19,15 @@ const api = {
   getWeeklyUsage: (days?: number): Promise<DailyUsage[]> =>
     ipcRenderer.invoke('usage:weekly', days),
   getRanking: (by: RankingBy): Promise<Track[]> => ipcRenderer.invoke('stats:ranking', by),
+  prepareVariant: (trackPath: string, rate: number): Promise<VariantResult> =>
+    ipcRenderer.invoke('audio:variant', trackPath, rate),
+  onVariantProgress: (cb: (p: VariantProgress) => void): (() => void) => {
+    const listener = (_e: unknown, p: VariantProgress): void => cb(p)
+    ipcRenderer.on('audio:variant-progress', listener)
+    return () => {
+      ipcRenderer.removeListener('audio:variant-progress', listener)
+    }
+  },
   onTogglePlay: (cb: () => void): (() => void) => {
     const listener = (): void => cb()
     ipcRenderer.on('player:toggle', listener)

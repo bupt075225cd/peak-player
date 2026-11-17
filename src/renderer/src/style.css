@@ -248,6 +248,16 @@ tbody tr:hover {
   font-variant-numeric: tabular-nums;
 }
 
+.player-bar .prep {
+  font-size: 13px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.player-bar .prep.warn {
+  color: #e5a13a;
+}
+
 .chart {
   width: 100%;
   height: 420px;

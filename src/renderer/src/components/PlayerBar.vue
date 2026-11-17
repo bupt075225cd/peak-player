@@ -15,7 +15,7 @@ const title = computed(() => playerState.current?.title ?? '未在播放')
 const loopLabel = computed(() => loopLabels[playerState.loopMode])
 
 function setRate(e: Event): void {
-  player.rate = Number((e.target as HTMLSelectElement).value)
+  void player.setRate(Number((e.target as HTMLSelectElement).value))
 }
 
 function cycleLoop(): void {
@@ -44,6 +44,12 @@ function fmt(s: number): string {
         <option v-for="r in rateOptions" :key="r" :value="r">{{ r.toFixed(2) }}x</option>
       </select>
     </label>
+    <span v-if="playerState.preparing" class="prep">
+      正在生成 {{ playerState.rate }}x 音频 {{ Math.round(playerState.progress * 100) }}%
+    </span>
+    <span v-else-if="playerState.fallback && playerState.rate !== 1" class="prep warn">
+      内置变速（音质略差）
+    </span>
     <div class="time">{{ fmt(playerState.currentTime) }} / {{ fmt(playerState.duration) }}</div>
   </div>
 </template>

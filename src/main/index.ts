@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { registerIpc } from './ipc'
 import { registerMediaProtocol, registerSchemes } from './protocol'
 import { createTray } from './tray'
+import { pruneVariantCache } from './transcode'
 import { createWindow, getMainWindow, setQuitting } from './window'
 
 // 必须在 app ready 之前注册自定义协议 scheme
@@ -12,6 +13,9 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   createTray()
+
+  // 变速缓存清理放到空闲时执行，不阻塞窗口显示
+  setTimeout(() => pruneVariantCache(), 5000)
 
   app.on('activate', () => {
     const win = getMainWindow()

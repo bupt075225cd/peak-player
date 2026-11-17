@@ -8,6 +8,8 @@ export interface PeakPlayerApi {
   addUsage(seconds: number, trackId: string | null): Promise<void>
   getWeeklyUsage(days?: number): Promise<DailyUsage[]>
   getRanking(by: RankingBy): Promise<Track[]>
+  prepareVariant(trackPath: string, rate: number): Promise<VariantResult>
+  onVariantProgress(cb: (p: VariantProgress) => void): () => void
   onTogglePlay(cb: () => void): () => void
 }
 

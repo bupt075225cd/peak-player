@@ -1,7 +1,7 @@
 import { dialog, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import type { RankingBy, Track } from '../shared/types'
+import type { RankingBy, Track, VariantProgress, VariantResult } from '../shared/types'
 import {
   addTrackSeconds,
   addTracks,
@@ -12,6 +12,7 @@ import {
   listTracks,
   updateTrack
 } from './db'
+import { prepareVariant } from './transcode'
 import { getMainWindow } from './window'
 
 // 仅保留 Chromium 内置可解码的格式；.wma 无解码器，导入后无法播放
