@@ -3,6 +3,16 @@ import { resolveTrackUrl } from '../../../shared/track-url'
 import type { LoopMode, Track } from '../../../shared/types'
 import { useLibraryStore } from '../stores/library'
 import {
+  acceptsProgress,
+  clampRate,
+  endedAction,
+  elapsedSeconds,
+  formatMediaError,
+  needsVariant,
+  RATE_MAX,
+  RATE_MIN
+} from './playback'
+import {
   needsDurationReport,
   resolvePlaybackRate,
   toDisplayDuration,
@@ -11,9 +21,7 @@ import {
 } from './time-mapping'
 
 export type { LoopMode }
-
-export const RATE_MIN = 0.7
-export const RATE_MAX = 1.5
+export { RATE_MAX, RATE_MIN }
 
 export const playerState = reactive({
   current: null as Track | null,
@@ -70,7 +78,7 @@ class PlayerEngine {
     this.audio.addEventListener('error', () => {
       const err = this.audio.error
       if (!err) return
-      playerState.error = `无法读取音频（code ${err.code}）${err.message ? '：' + err.message : ''}`
+      playerState.error = formatMediaError(err.code, err.message)
       // play() 会先触发 play 事件再报错，这里纠正状态，避免显示「暂停」却没声音
       this.stopTimer()
       playerState.playing = false
@@ -78,7 +86,7 @@ class PlayerEngine {
     })
 
     window.api.onVariantProgress((p) => {
-      if (playerState.preparing && p.rate === playerState.rate) playerState.progress = p.ratio
+      if (acceptsProgress(p, playerState)) playerState.progress = p.ratio
     })
   }
 
@@ -95,7 +103,7 @@ class PlayerEngine {
 
   // 切换倍速：0.8~1.5 走 ffmpeg 预渲染（变速不变调、音质更好），失败则退回内置伸缩
   async setRate(r: number): Promise<void> {
-    const v = Math.min(RATE_MAX, Math.max(RATE_MIN, r))
+    const v = clampRate(r)
     if (v === playerState.rate) return
 
     const token = ++this.rateToken
@@ -171,8 +179,8 @@ class PlayerEngine {
   private async resolveUrl(track: Track): Promise<string | null> {
     const rate = playerState.rate
 
-    // 1x 或远程源：直接播放原文件
-    if (rate === 1 || track.sourceType === 'remote' || this.variantDisabled) {
+    // 1x、远程源、ffmpeg 已判定不可用：直接播放原文件
+    if (!needsVariant({ rate, sourceType: track.sourceType, variantDisabled: this.variantDisabled })) {
       this.srcRate = 1
       this.audio.playbackRate = rate
       playerState.fallback = rate !== 1
@@ -208,12 +216,13 @@ class PlayerEngine {
 
   // 同步时长到 UI，并采集曲目真实时长（改次数时按它换算用时统计）
   private syncDuration(): void {
-    const duration = this.audio.duration * this.srcRate
-    if (!Number.isFinite(duration) || duration <= 0) return
+    const duration = toDisplayDuration(this.audio.duration, this.srcRate)
+    // 加载中或长度未知时 Chromium 会给 Infinity/NaN，换算后为 0，这里直接跳过
+    if (duration <= 0) return
     playerState.duration = duration
 
     const cur = playerState.current
-    if (cur && Math.abs(cur.duration - duration) > 1) {
+    if (cur && needsDurationReport(cur.duration, duration)) {
       cur.duration = duration
       void window.api.setTrackDuration(cur.id, duration)
     }
@@ -230,7 +239,7 @@ class PlayerEngine {
         useLibraryStore().syncPlayCount(id, count)
       })
     }
-    if (this.loopMode === 'single') {
+    if (endedAction(this.loopMode) === 'replay') {
       this.audio.currentTime = 0
       void this.safePlay()
     }
@@ -244,7 +253,7 @@ class PlayerEngine {
 
   private settleTime(): void {
     if (this.startTime === 0) return
-    const sec = Math.floor((Date.now() - this.startTime) / 1000)
+    const sec = elapsedSeconds(this.startTime, Date.now())
     if (sec > 0 && playerState.current) {
       window.api.addUsage(sec, playerState.current.id)
     }

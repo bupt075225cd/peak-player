@@ -2,6 +2,7 @@
 import type { Track } from '../../../shared/types'
 import { player } from '../core/player'
 import { useStatsStore } from '../stores/stats'
+import { formatSpokenDuration } from '../utils/format'
 
 const stats = useStatsStore()
 
@@ -9,12 +10,7 @@ function play(track: Track): void {
   void player.play(track)
 }
 
-function fmtDuration(s: number): string {
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (h > 0) return `${h} 小时 ${m} 分`
-  return `${m} 分钟`
-}
+const fmtDuration = formatSpokenDuration
 </script>
 
 <template>

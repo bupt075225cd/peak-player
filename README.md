@@ -43,8 +43,9 @@ peak-player/
     │   └── source.ts     # 音源抽象层（对象存储扩展点）
     ├── preload/          # contextBridge 安全桥接
     └── renderer/         # Vue 3 界面
-        ├── core/player.ts    # 播放引擎（倍速/循环计数/计时）
+        ├── core/             # 播放引擎（player）+ 纯函数（时间轴换算/播放决策）
         ├── stores/           # Pinia 状态
+        ├── utils/            # 展示格式化与图表整形（纯函数）
         ├── views/            # 音乐库 / 排行榜 / 用时统计
         └── components/       # 播放控制条
 ```
@@ -82,10 +83,33 @@ npm run package:linux   # Linux (AppImage)
 
 ## 单元测试
 
-使用 Vitest 编写单元测试，覆盖核心业务逻辑：
+使用 Vitest 编写单元测试，覆盖核心业务逻辑。原则是「先抽纯函数再测」，避免为测试挂载 Vue 组件。
+
+**主进程**
 
 - `src/main/db.test.ts` — 数据库操作（增删改查、计数、用时、排行、周统计）
 - `src/main/source.test.ts` — 音源抽象层
+- `src/main/range.test.ts` — Range 请求解析与 200/206/416 响应头
+- `src/main/media-request.test.ts` — `media://` 请求解析与状态码决策
+- `src/main/ffmpeg-args.test.ts` — rubberband 滤镜串、`-i` 探测输出与 `-progress` 解析
+- `src/main/ffmpeg-path.test.ts` — ffmpeg 可执行文件路径回退
+- `src/main/transcode-pure.test.ts` — 转码参数拼装、产物判定、错误与日志文案
+- `src/main/variant-cache.test.ts` — 变速缓存命名与清理策略
+- `src/main/track-duration.test.ts` — 时长采集结果的取整与校验
+- `src/main/audio-exts.test.ts` — 可导入音频扩展名白名单
+- `src/main/ipc-contract.test.ts` — IPC 通道契约
+
+**渲染进程**
+
+- `src/renderer/src/core/time-mapping.test.ts` — 变速播放的时间轴换算
+- `src/renderer/src/core/playback.test.ts` — 倍速钳制、降级判断、进度采纳、计时结算、循环动作
+- `src/renderer/src/utils/format.test.ts` — 时间/时长/倍速/进度展示与次数输入解析
+- `src/renderer/src/utils/chart.test.ts` — 用时统计图的数据整形与 option 构造
+- `src/renderer/src/stores/library.test.ts` — 音乐库 store
+- `src/renderer/src/stores/stats.test.ts` — 统计 store
+
+**共享**
+
 - `src/shared/track-url.test.ts` — 音源 URL 解析
 
 ```bash
@@ -94,10 +118,16 @@ npm test
 
 # 监听模式
 npm run test:watch
+
+# 覆盖率报告（coverage/）
+npm run test:coverage
 ```
 
 > 说明：better-sqlite3 以 electron ABI 编译，测试通过 `scripts/run-tests.mjs`
 > 以 `ELECTRON_RUN_AS_NODE=1` 方式运行，确保原生模块 ABI 与运行时一致。
+>
+> 若本机 glibc < 2.29（见下方常见问题），`db.test.ts` 会因原生模块加载失败而整片标红。
+> 此时用 `PEAK_SKIP_DB=1 npm test` 跳过数据库用例、验证其余逻辑，数据库用例交给 CI 或远程开发机。
 
 ## 架构说明
 

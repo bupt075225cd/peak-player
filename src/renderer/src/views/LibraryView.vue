@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import type { Track } from '../../../shared/types'
 import { player, playerState } from '../core/player'
 import { useLibraryStore } from '../stores/library'
+import { parseCountInput, resolveCountChange } from '../utils/format'
 
 const library = useLibraryStore()
 
@@ -32,19 +33,12 @@ function cancelEdit(): void {
   editingId.value = null
 }
 
-function parseEditingValue(): number | null {
-  const raw = editingValue.value
-  if (raw === '' || raw === null || raw === undefined) return null
-  const n = typeof raw === 'number' ? raw : Number(String(raw).trim())
-  return Number.isFinite(n) ? n : null
-}
-
 async function commitEdit(track: Track): Promise<void> {
   if (editingId.value !== track.id) return
-  const n = parseEditingValue()
+  const next = resolveCountChange(track.playCount, parseCountInput(editingValue.value))
   editingId.value = null
-  if (n === null || !Number.isInteger(n) || n < 0 || n === track.playCount) return
-  await library.setPlayCount(track.id, n)
+  if (next === null) return
+  await library.setPlayCount(track.id, next)
 }
 </script>
 

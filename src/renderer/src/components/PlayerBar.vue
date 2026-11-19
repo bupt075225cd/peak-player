@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { player, playerState } from '../core/player'
+import { formatClock, formatRateLabel, progressPercent } from '../utils/format'
 
 const rateOptions = [0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
 
@@ -23,12 +24,7 @@ function cycleLoop(): void {
   player.loopMode = loopOrder[(idx + 1) % loopOrder.length]
 }
 
-function fmt(s: number): string {
-  if (!Number.isFinite(s)) return '0:00'
-  const m = Math.floor(s / 60)
-  const sec = Math.floor(s % 60)
-  return `${m}:${sec.toString().padStart(2, '0')}`
-}
+const fmt = formatClock
 </script>
 
 <template>
@@ -41,11 +37,11 @@ function fmt(s: number): string {
     <label class="rate">
       倍速
       <select :value="playerState.rate" @change="setRate">
-        <option v-for="r in rateOptions" :key="r" :value="r">{{ r.toFixed(2) }}x</option>
+        <option v-for="r in rateOptions" :key="r" :value="r">{{ formatRateLabel(r) }}</option>
       </select>
     </label>
     <span v-if="playerState.preparing" class="prep">
-      正在生成 {{ playerState.rate }}x 音频 {{ Math.round(playerState.progress * 100) }}%
+      正在生成 {{ playerState.rate }}x 音频 {{ progressPercent(playerState.progress) }}%
     </span>
     <span v-if="playerState.error" class="error" :title="playerState.error">
       {{ playerState.error }}

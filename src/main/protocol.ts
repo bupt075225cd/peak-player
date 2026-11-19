@@ -2,6 +2,7 @@ import { protocol } from 'electron'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { Readable } from 'node:stream'
+import { mediaStatus, parseMediaPath, unsatisfiableHeaders } from './media-request'
 import { fullHeaders, mimeFor, parseRange, partialHeaders } from './range'
 
 // 自定义协议：让渲染进程(开发态为 http://localhost)也能访问本地音频文件，
@@ -30,8 +31,7 @@ function streamOf(path: string, options?: { start: number; end: number }): Reada
 // 缺了长度信息时 Chromium 会把 duration 判为 Infinity，进度与拖动都会失效
 export function registerMediaProtocol(): void {
   protocol.handle('media', async (request) => {
-    const url = new URL(request.url)
-    const filePath = url.searchParams.get('path') ?? ''
+    const filePath = parseMediaPath(request.url)
     if (!filePath) return new Response('Bad Request', { status: 400 })
 
     let size: number
@@ -45,17 +45,18 @@ export function registerMediaProtocol(): void {
 
     const mime = mimeFor(filePath)
     const range = parseRange(request.headers.get('range'), size)
+    const status = mediaStatus(range)
 
-    if (range.kind === 'unsatisfiable') {
+    if (status === 416) {
       return new Response('Range Not Satisfiable', {
-        status: 416,
-        headers: { 'content-range': `bytes */${size}` }
+        status,
+        headers: unsatisfiableHeaders(size)
       })
     }
 
-    if (range.kind === 'partial') {
+    if (status === 206 && range.kind === 'partial') {
       return new Response(streamOf(filePath, { start: range.start, end: range.end }), {
-        status: 206,
+        status,
         headers: partialHeaders(mime, range.start, range.end, size)
       })
     }

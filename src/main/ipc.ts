@@ -2,6 +2,7 @@ import { dialog, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import type { RankingBy, Track, VariantProgress, VariantResult } from '../shared/types'
+import { isSupportedAudio } from './audio-exts'
 import {
   addTrackSeconds,
   addTracks,
@@ -18,9 +19,6 @@ import { prepareVariant, probeAudioDuration } from './transcode'
 import { ensureTrackDuration } from './track-duration'
 import { getMainWindow } from './window'
 
-// 仅保留 Chromium 内置可解码的格式；.wma 无解码器，导入后无法播放
-const AUDIO_EXTS = new Set(['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.opus'])
-
 export function registerIpc(): void {
   ipcMain.handle('tracks:import', async (): Promise<Track[]> => {
     const win = getMainWindow()
@@ -34,7 +32,7 @@ export function registerIpc(): void {
     if (result.canceled) return listTracks()
 
     const tracks: Track[] = result.filePaths
-      .filter((p) => AUDIO_EXTS.has(path.extname(p).toLowerCase()))
+      .filter(isSupportedAudio)
       .map((p) => ({
         id: randomUUID(),
         title: path.basename(p, path.extname(p)),
