@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import Database from 'better-sqlite3'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Track } from '../shared/types'
 import {
@@ -5,12 +9,14 @@ import {
   addTrackSeconds,
   addUsage,
   getRanking,
+  getTrack,
   getWeeklyUsage,
   incrementCount,
   initDb,
   listTracks,
   localDate,
   setPlayCount,
+  setTrackDuration,
   updateTrack
 } from './db'
 
@@ -167,5 +173,82 @@ describe('addTrackSeconds', () => {
     addTrackSeconds('1', 30)
     addTrackSeconds('1', 20)
     expect(listTracks()[0].totalSeconds).toBe(50)
+  })
+})
+
+describe('getTrack', () => {
+  it('按 id 返回单曲', () => {
+    addTracks([
+      makeTrack({ id: '1', title: 'A', playCount: 3, totalSeconds: 120, duration: 30 })
+    ])
+    const t = getTrack('1')
+    expect(t?.title).toBe('A')
+    expect(t?.playCount).toBe(3)
+    expect(t?.totalSeconds).toBe(120)
+    expect(t?.duration).toBe(30)
+  })
+
+  it('id 不存在时返回 undefined', () => {
+    expect(getTrack('nope')).toBeUndefined()
+  })
+})
+
+describe('setTrackDuration', () => {
+  it('写入曲目时长并取整', () => {
+    addTracks([makeTrack({ id: '1' })])
+    setTrackDuration('1', 200.0457)
+    expect(getTrack('1')?.duration).toBe(200)
+  })
+
+  it('非法值（0/NaN/负数）不改写已有值', () => {
+    addTracks([makeTrack({ id: '1', duration: 12 })])
+    setTrackDuration('1', 0)
+    setTrackDuration('1', Number.NaN)
+    setTrackDuration('1', -5)
+    expect(getTrack('1')?.duration).toBe(12)
+  })
+})
+
+describe('initDb 迁移', () => {
+  it('老库缺少 duration 列时自动补列并保留原有数据', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'peak-player-migrate-'))
+    const file = join(dir, 'peak-player.db')
+
+    // 手工造一个升级前的库：tracks 表没有 duration 列
+    const legacy = new Database(file)
+    legacy.exec(`
+      CREATE TABLE tracks (
+        id            TEXT PRIMARY KEY,
+        title         TEXT NOT NULL,
+        path          TEXT NOT NULL,
+        source_type   TEXT NOT NULL DEFAULT 'local',
+        play_count    INTEGER NOT NULL DEFAULT 0,
+        total_seconds INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE daily_usage (
+        date    TEXT PRIMARY KEY,
+        seconds INTEGER NOT NULL DEFAULT 0
+      );
+    `)
+    legacy
+      .prepare('INSERT INTO tracks (id, title, path, play_count, total_seconds) VALUES (?,?,?,?,?)')
+      .run('legacy', 'Old', '/music/old.mp3', 2, 60)
+    legacy.close()
+
+    initDb(file) // 触发加列迁移
+
+    const migrated = getTrack('legacy')
+    expect(migrated?.title).toBe('Old')
+    expect(migrated?.playCount).toBe(2)
+    expect(migrated?.totalSeconds).toBe(60)
+    expect(migrated?.duration).toBe(0)
+
+    // 新列可正常写入
+    setTrackDuration('legacy', 33)
+    expect(getTrack('legacy')?.duration).toBe(33)
+
+    // 先切回内存库释放文件句柄，否则 Windows 上目录删不掉
+    initDb(':memory:')
+    rmSync(dir, { recursive: true, force: true })
   })
 })

@@ -47,8 +47,16 @@ jobs:
 
       # scripts/run-tests.mjs 用 ELECTRON_RUN_AS_NODE 跑 vitest，
       # 与 install-app-deps 重建后的 better-sqlite3 ABI 一致
-      - name: Unit tests
-        run: npm test
+      - name: Unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage/
+          if-no-files-found: warn
 
       - name: Build (electron-vite)
         run: npm run build
