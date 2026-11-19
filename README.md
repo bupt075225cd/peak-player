@@ -126,8 +126,8 @@ npm run test:coverage
 > 说明：better-sqlite3 以 electron ABI 编译，测试通过 `scripts/run-tests.mjs`
 > 以 `ELECTRON_RUN_AS_NODE=1` 方式运行，确保原生模块 ABI 与运行时一致。
 >
-> 若本机 glibc < 2.29（见下方常见问题），`db.test.ts` 会因原生模块加载失败而整片标红。
-> 此时用 `PEAK_SKIP_DB=1 npm test` 跳过数据库用例、验证其余逻辑，数据库用例交给 CI 或远程开发机。
+> 本机 glibc < 2.29 时该原生模块加载不了，`db.test.ts` 会整片标红（并非代码问题），
+> 处理方式见下方常见问题「GLIBC_2.29 not found」。
 
 ## 架构说明
 
@@ -225,6 +225,9 @@ node <npm-node-gyp路径> rebuild --release \
   --target=<electron版本> --arch=x64 \
   --dist-url=https://electronjs.org/headers/
 ```
+
+重编译不可行时，`db.test.ts` 会在该机器上整片失败，这与代码无关：把单元测试交给 CI
+（`.github/workflows/ci.yml`，跑在 windows-latest）或另一台 glibc 达标的机器验证即可。
 
 ### electron 启动报缺少共享库（如 `libnss3.so`）
 
