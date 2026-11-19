@@ -50,7 +50,10 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Build Windows installer
+      - name: Build (electron-vite)
+        run: npm run build
+
+      - name: Package Windows installer
         run: npm run package:win
 
       - name: Upload installer
