@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+# push 前：静态检查 → 单元测试 → 编译 → 打 Windows 安装包
+# 与 .github/workflows/ci.yml 中的 CI 步骤保持一致。
+#
+# 跳过方式（紧急情况）：
+#   SKIP_WIN_PACKAGE=1 git push   仅跳过 Windows 打包
+#   git push --no-verify         跳过全部钩子
+
+set -e
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo '!! 未找到 npm，无法执行 pre-push 检查。请先安装 Node.js 并 npm install。' >&2
+  exit 1
+fi
+
+echo '==> [1/4] 静态检查'
+npm run lint
+
+echo '==> [2/4] 单元测试'
+npm test
+
+echo '==> [3/4] 编译'
+npm run build
+
+echo '==> [4/4] 打 Windows 安装包'
+if [ "$SKIP_WIN_PACKAGE" = '1' ]; then
+  echo '    已设置 SKIP_WIN_PACKAGE=1，跳过打包'
+  exit 0
+fi
+
+# 打 Windows 安装包需要 wine；Windows 原生环境不需要
+case "$(uname -s 2>/dev/null)" in
+  MINGW* | MSYS* | CYGWIN*) on_windows=1 ;;
+  *) on_windows=0 ;;
+esac
+
+if [ "$on_windows" = '0' ] && ! command -v wine >/dev/null 2>&1; then
+  echo '!! 未检测到 wine，当前平台无法打 Windows 安装包。' >&2
+  echo '!! 请改用 Windows 机器执行，或用 SKIP_WIN_PACKAGE=1 git push 跳过打包。' >&2
+  exit 1
+fi
+
+npm run package:win
+
+# electron-builder 会把 better-sqlite3 重建成 win32 ABI，
+# 这里恢复成本机平台，避免影响后续本地开发与单测
+echo '==> 恢复本机原生依赖'
+npm run postinstall

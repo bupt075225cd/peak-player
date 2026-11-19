@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+# 提交前只做静态检查，保证 commit 速度；
+# 单元测试、编译与 Windows 打包放在 pre-push 和 CI（.github/workflows/ci.yml）
+if ! command -v npm >/dev/null 2>&1; then
+  echo '!! 未找到 npm，无法执行静态检查。请先安装 Node.js 并 npm install。' >&2
+  exit 1
+fi
+
+npm run lint

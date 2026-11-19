@@ -1,0 +1,64 @@
+name: CI
+
+# 推送到 GitHub 时触发；PR 与手动触发同样生效
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 已在仓库内配置好钩子，CI 不需要再安装 git hooks
+  HUSKY: '0'
+
+jobs:
+  build:
+    name: lint / test / build / package (windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # ffmpeg 二进制不进仓库，缓存下来避免每次重新下载 80MB
+      - name: Cache ffmpeg binary
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: resources/bin
+          key: ffmpeg-${{ runner.os }}-b6.1.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 与 .husky/pre-push 的四个步骤一一对应
+      - name: Static check (tsc + vue-tsc)
+        run: npm run lint
+
+      # scripts/run-tests.mjs 用 ELECTRON_RUN_AS_NODE 跑 vitest，
+      # 与 install-app-deps 重建后的 better-sqlite3 ABI 一致
+      - name: Unit tests
+        run: npm test
+
+      - name: Build Windows installer
+        run: npm run package:win
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: peak-player-windows-${{ github.sha }}
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+          if-no-files-found: error
