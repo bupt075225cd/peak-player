@@ -10,6 +10,7 @@ function makeTrack(overrides: Partial<Track>): Track {
     sourceType: 'local',
     playCount: 0,
     totalSeconds: 0,
+    duration: 0,
     ...overrides
   }
 }

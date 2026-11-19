@@ -5,7 +5,7 @@ import { useLibraryStore } from '../stores/library'
 
 export type { LoopMode }
 
-export const RATE_MIN = 0.8
+export const RATE_MIN = 0.7
 export const RATE_MAX = 1.5
 
 export const playerState = reactive({
@@ -19,8 +19,10 @@ export const playerState = reactive({
   // 正在用 ffmpeg 生成变速文件
   preparing: false,
   progress: 0,
-  // true 表示本次变速退回了 Chromium 内置伸缩（音质会差一些）
-  fallback: false
+  // true 表示本次变速退回了 Chromium 内置伸缩
+  fallback: false,
+  // 播放失败原因（文件缺失/解码失败/被策略拦截），正常播放时为空
+  error: ''
 })
 
 class PlayerEngine {
@@ -53,8 +55,19 @@ class PlayerEngine {
     this.audio.addEventListener('timeupdate', () => {
       playerState.currentTime = this.audio.currentTime * this.srcRate
     })
-    this.audio.addEventListener('loadedmetadata', () => {
-      playerState.duration = (this.audio.duration || 0) * this.srcRate
+    // loadedmetadata 阶段 duration 可能是 Infinity（长度未确定），
+    // 用 durationchange 兜底，并只接受有限值
+    this.audio.addEventListener('loadedmetadata', () => this.syncDuration())
+    this.audio.addEventListener('durationchange', () => this.syncDuration())
+    // 资源加载失败（文件被移动/删除、协议取不到数据）不会抛到界面上，这里兜住
+    this.audio.addEventListener('error', () => {
+      const err = this.audio.error
+      if (!err) return
+      playerState.error = `无法读取音频（code ${err.code}）${err.message ? '：' + err.message : ''}`
+      // play() 会先触发 play 事件再报错，这里纠正状态，避免显示「暂停」却没声音
+      this.stopTimer()
+      playerState.playing = false
+      console.warn('[player] 音频加载失败：', err.code, err.message)
     })
 
     window.api.onVariantProgress((p) => {
@@ -89,7 +102,7 @@ class PlayerEngine {
     this.audio.pause()
     await this.load(track, srcTime)
     if (token !== this.rateToken) return
-    if (wasPlaying) await this.audio.play()
+    if (wasPlaying) await this.safePlay()
   }
 
   async play(track?: Track): Promise<void> {
@@ -98,7 +111,20 @@ class PlayerEngine {
     } else if (!this.audio.src) {
       return
     }
-    await this.audio.play()
+    await this.safePlay()
+  }
+
+  // play() 失败（文件丢失、解码不支持、自动播放被拦截）默认只会产生一条
+  // 静默的 Promise rejection，界面上表现为「点了没反应」，这里显式暴露出来
+  private async safePlay(): Promise<void> {
+    try {
+      await this.audio.play()
+      playerState.error = ''
+    } catch (err) {
+      playerState.error = `播放失败：${err instanceof Error ? err.message : String(err)}`
+      playerState.playing = false
+      console.warn('[player] 播放失败：', err)
+    }
   }
 
   toggle(): void {
@@ -129,6 +155,9 @@ class PlayerEngine {
 
     this.audio.src = url
     this.audio.load()
+    // load() 会把 playbackRate 重置为 defaultPlaybackRate(1)，
+    // 退回内置伸缩时必须重新设置，否则降速完全不生效
+    this.audio.playbackRate = this.srcRate === 1 ? playerState.rate : 1
     if (srcTime > 0) this.audio.currentTime = srcTime / this.srcRate
   }
 
@@ -170,6 +199,19 @@ class PlayerEngine {
     return resolveTrackUrl(track)
   }
 
+  // 同步时长到 UI，并采集曲目真实时长（改次数时按它换算用时统计）
+  private syncDuration(): void {
+    const duration = this.audio.duration * this.srcRate
+    if (!Number.isFinite(duration) || duration <= 0) return
+    playerState.duration = duration
+
+    const cur = playerState.current
+    if (cur && Math.abs(cur.duration - duration) > 1) {
+      cur.duration = duration
+      void window.api.setTrackDuration(cur.id, duration)
+    }
+  }
+
   // 完成一次播放：计数 +1；单曲循环则重播（不用 audio.loop，否则不触发 ended）
   private onEnded(): void {
     const cur = playerState.current
@@ -183,7 +225,7 @@ class PlayerEngine {
     }
     if (this.loopMode === 'single') {
       this.audio.currentTime = 0
-      void this.audio.play()
+      void this.safePlay()
     }
     // 'all' 模式由外部队列处理切歌；'none' 模式自然停止
   }

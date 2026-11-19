@@ -26,13 +26,20 @@ export function initDb(dbPath?: string): void {
       path          TEXT NOT NULL,
       source_type   TEXT NOT NULL DEFAULT 'local',
       play_count    INTEGER NOT NULL DEFAULT 0,
-      total_seconds INTEGER NOT NULL DEFAULT 0
+      total_seconds INTEGER NOT NULL DEFAULT 0,
+      duration      INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS daily_usage (
       date    TEXT PRIMARY KEY,
       seconds INTEGER NOT NULL DEFAULT 0
     );
   `)
+
+  // 轻量迁移：老库补 duration 列（播放时采集，用于改次数时联动用时统计）
+  const columns = db.prepare('PRAGMA table_info(tracks)').all() as { name: string }[]
+  if (!columns.some((c) => c.name === 'duration')) {
+    db.exec('ALTER TABLE tracks ADD COLUMN duration INTEGER NOT NULL DEFAULT 0')
+  }
 }
 
 function getDb(): Database.Database {
@@ -44,12 +51,12 @@ function getDb(): Database.Database {
 export function addTracks(items: Track[]): number {
   const d = getDb()
   const stmt = d.prepare(`
-    INSERT OR IGNORE INTO tracks (id, title, path, source_type, play_count, total_seconds)
-    VALUES (@id, @title, @path, @sourceType, @playCount, @totalSeconds)
+    INSERT OR IGNORE INTO tracks (id, title, path, source_type, play_count, total_seconds, duration)
+    VALUES (@id, @title, @path, @sourceType, @playCount, @totalSeconds, @duration)
   `)
   const tx = d.transaction((rows: Track[]) => {
     let n = 0
-    for (const r of rows) n += stmt.run(r).changes
+    for (const r of rows) n += stmt.run({ ...r, duration: r.duration ?? 0 }).changes
     return n
   })
   return tx(items)
@@ -59,24 +66,69 @@ export function listTracks(): Track[] {
   return getDb()
     .prepare(`
       SELECT id, title, path, source_type AS sourceType,
-             play_count AS playCount, total_seconds AS totalSeconds
+             play_count AS playCount, total_seconds AS totalSeconds, duration
       FROM tracks ORDER BY title ASC
     `)
     .all() as Track[]
 }
 
+export function getTrack(id: string): Track | undefined {
+  return getDb()
+    .prepare(`
+      SELECT id, title, path, source_type AS sourceType,
+             play_count AS playCount, total_seconds AS totalSeconds, duration
+      FROM tracks WHERE id = ?
+    `)
+    .get(id) as Track | undefined
+}
+
 export function updateTrack(id: string, patch: Partial<Pick<Track, 'playCount'>>): void {
-  const fields: string[] = []
-  const values: unknown[] = []
-  if (patch.playCount !== undefined) {
-    fields.push('play_count = ?')
-    values.push(patch.playCount)
-  }
-  if (fields.length === 0) return
-  values.push(id)
+  if (patch.playCount === undefined) return
+  setPlayCount(id, patch.playCount)
+}
+
+// 改次数并联动用时统计：
+// 增加的次数按曲目时长记到今天；减少的次数从最早的日期开始逐天扣减
+export function setPlayCount(id: string, count: number): void {
+  const d = getDb()
+  const row = d
+    .prepare('SELECT play_count, total_seconds, duration FROM tracks WHERE id = ?')
+    .get(id) as { play_count: number; total_seconds: number; duration: number } | undefined
+  if (!row) return
+
+  const next = Math.max(0, Math.floor(count))
+  const deltaSeconds = (next - row.play_count) * row.duration
+
+  const tx = d.transaction(() => {
+    d.prepare('UPDATE tracks SET play_count = ? WHERE id = ?').run(next, id)
+    if (deltaSeconds === 0) return
+
+    if (deltaSeconds > 0) {
+      d.prepare('UPDATE tracks SET total_seconds = total_seconds + ? WHERE id = ?').run(
+        deltaSeconds,
+        id
+      )
+      addUsage(deltaSeconds)
+      return
+    }
+
+    // 减少：单曲总时长不低于 0，每日用时从最早日期开始扣
+    const need = -deltaSeconds
+    d.prepare('UPDATE tracks SET total_seconds = ? WHERE id = ?').run(
+      Math.max(0, row.total_seconds - need),
+      id
+    )
+    deductUsageOldestFirst(need)
+  })
+  tx()
+}
+
+// 播放时采集曲目真实时长（秒）
+export function setTrackDuration(id: string, seconds: number): void {
+  if (!Number.isFinite(seconds) || seconds <= 0) return
   getDb()
-    .prepare(`UPDATE tracks SET ${fields.join(', ')} WHERE id = ?`)
-    .run(...values)
+    .prepare('UPDATE tracks SET duration = ? WHERE id = ?')
+    .run(Math.round(seconds), id)
 }
 
 // 返回自增后的最新次数，供渲染进程直接同步 UI
@@ -92,14 +144,37 @@ export function addTrackSeconds(id: string, seconds: number): void {
 }
 
 // ---- 用时 ----
-export function addUsage(seconds: number): void {
-  const today = localDate(new Date())
+export function addUsage(seconds: number, date = localDate(new Date())): void {
+  const today = date
   getDb()
     .prepare(`
       INSERT INTO daily_usage (date, seconds) VALUES (?, ?)
       ON CONFLICT(date) DO UPDATE SET seconds = seconds + excluded.seconds
     `)
     .run(today, seconds)
+}
+
+// 从最早的日期开始逐天扣减，某天扣到 0 就删掉该天记录
+export function deductUsageOldestFirst(seconds: number): number {
+  if (seconds <= 0) return 0
+  const d = getDb()
+  const rows = d
+    .prepare('SELECT date, seconds FROM daily_usage ORDER BY date ASC')
+    .all() as { date: string; seconds: number }[]
+  const update = d.prepare('UPDATE daily_usage SET seconds = ? WHERE date = ?')
+  const remove = d.prepare('DELETE FROM daily_usage WHERE date = ?')
+
+  let remaining = seconds
+  for (const row of rows) {
+    if (remaining <= 0) break
+    const take = Math.min(row.seconds, remaining)
+    const left = row.seconds - take
+    if (left > 0) update.run(left, row.date)
+    else remove.run(row.date)
+    remaining -= take
+  }
+  // 返回未扣完的余量（历史记录不足时）
+  return remaining
 }
 
 // 返回补齐的近 N 天数据（缺失的日期补 0），供柱形图直接使用
@@ -123,7 +198,7 @@ export function getRanking(by: RankingBy): Track[] {
   return getDb()
     .prepare(`
       SELECT id, title, path, source_type AS sourceType,
-             play_count AS playCount, total_seconds AS totalSeconds
+             play_count AS playCount, total_seconds AS totalSeconds, duration
       FROM tracks
       WHERE ${order} > 0
       ORDER BY ${order} DESC

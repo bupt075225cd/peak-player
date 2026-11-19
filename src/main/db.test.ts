@@ -9,6 +9,8 @@ import {
   incrementCount,
   initDb,
   listTracks,
+  localDate,
+  setPlayCount,
   updateTrack
 } from './db'
 
@@ -20,6 +22,7 @@ function makeTrack(overrides: Partial<Track>): Track {
     sourceType: 'local',
     playCount: 0,
     totalSeconds: 0,
+    duration: 0,
     ...overrides
   }
 }
@@ -65,6 +68,46 @@ describe('updateTrack / incrementCount', () => {
     addTracks([makeTrack({ id: '1', playCount: 3 })])
     expect(incrementCount('1', 1)).toBe(4)
     expect(incrementCount('1', 2)).toBe(6)
+  })
+})
+
+describe('setPlayCount 联动用时统计', () => {
+  it('增加次数时按曲目时长记入当天用时', () => {
+    addTracks([makeTrack({ id: '1', playCount: 2, totalSeconds: 60, duration: 30 })])
+    setPlayCount('1', 4) // +2 次 × 30 秒
+    expect(listTracks()[0].playCount).toBe(4)
+    expect(listTracks()[0].totalSeconds).toBe(120)
+    expect(getWeeklyUsage(7)[6].seconds).toBe(60)
+  })
+
+  it('减少次数时从最早的日期开始逐天扣减', () => {
+    addTracks([makeTrack({ id: '1', playCount: 4, totalSeconds: 200, duration: 30 })])
+    const d2 = localDate(new Date(Date.now() - 2 * 86400000))
+    const d1 = localDate(new Date(Date.now() - 86400000))
+    addUsage(50, d2)
+    addUsage(40, d1)
+
+    setPlayCount('1', 1) // -3 次 × 30 秒 = 90 秒：先扣最早那天 50，再扣昨天 40
+
+    const weekly = getWeeklyUsage(7)
+    expect(weekly[4].seconds).toBe(0)
+    expect(weekly[5].seconds).toBe(0)
+    expect(listTracks()[0].totalSeconds).toBe(110)
+  })
+
+  it('扣减不足时历史记录归零，不会出现负数', () => {
+    addTracks([makeTrack({ id: '1', playCount: 4, totalSeconds: 30, duration: 30 })])
+    addUsage(20, localDate(new Date(Date.now() - 86400000)))
+    setPlayCount('1', 0) // -4 次 × 30 秒 = 120 秒，但历史只有 20
+    expect(getWeeklyUsage(7)[5].seconds).toBe(0)
+    expect(listTracks()[0].totalSeconds).toBe(0)
+  })
+
+  it('曲目时长未知时不调整用时', () => {
+    addTracks([makeTrack({ id: '1', playCount: 1, duration: 0 })])
+    setPlayCount('1', 5)
+    expect(listTracks()[0].playCount).toBe(5)
+    expect(getWeeklyUsage(7)[6].seconds).toBe(0)
   })
 })
 

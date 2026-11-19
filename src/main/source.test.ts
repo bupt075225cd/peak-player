@@ -28,12 +28,28 @@ describe('RemoteSource', () => {
 
 describe('createSource', () => {
   it('local track 返回 LocalSource', () => {
-    const t: Track = { id: '1', title: 'a', path: '/a.mp3', sourceType: 'local', playCount: 0, totalSeconds: 0 }
+    const t: Track = {
+      id: '1',
+      title: 'a',
+      path: '/a.mp3',
+      sourceType: 'local',
+      playCount: 0,
+      totalSeconds: 0,
+      duration: 0
+    }
     expect(createSource(t)).toBeInstanceOf(LocalSource)
   })
 
   it('remote track 返回 RemoteSource', () => {
-    const t: Track = { id: '1', title: 'a', path: 'key', sourceType: 'remote', playCount: 0, totalSeconds: 0 }
+    const t: Track = {
+      id: '1',
+      title: 'a',
+      path: 'key',
+      sourceType: 'remote',
+      playCount: 0,
+      totalSeconds: 0,
+      duration: 0
+    }
     expect(createSource(t)).toBeInstanceOf(RemoteSource)
   })
 })

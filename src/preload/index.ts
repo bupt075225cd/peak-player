@@ -14,6 +14,8 @@ const api = {
     ipcRenderer.invoke('tracks:update', id, patch),
   incrementCount: (id: string, delta: number): Promise<number> =>
     ipcRenderer.invoke('tracks:increment', id, delta),
+  setTrackDuration: (id: string, seconds: number): Promise<void> =>
+    ipcRenderer.invoke('tracks:duration', id, seconds),
   addUsage: (seconds: number, trackId: string | null): Promise<void> =>
     ipcRenderer.invoke('usage:add', seconds, trackId),
   getWeeklyUsage: (days?: number): Promise<DailyUsage[]> =>

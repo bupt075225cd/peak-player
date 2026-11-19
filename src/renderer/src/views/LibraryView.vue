@@ -7,8 +7,9 @@ import { useLibraryStore } from '../stores/library'
 const library = useLibraryStore()
 
 // 行内编辑播放次数（Electron 渲染进程不支持 window.prompt）
+// 注意：input[type=number] 上的 v-model 会自动把值转成 number，所以这里要兼容两种类型
 const editingId = ref<string | null>(null)
-const editingValue = ref('')
+const editingValue = ref<string | number>('')
 
 // v-for 内的 template ref 会被收集为数组，这里用指令直接聚焦
 const vFocus = {
@@ -31,12 +32,18 @@ function cancelEdit(): void {
   editingId.value = null
 }
 
+function parseEditingValue(): number | null {
+  const raw = editingValue.value
+  if (raw === '' || raw === null || raw === undefined) return null
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim())
+  return Number.isFinite(n) ? n : null
+}
+
 async function commitEdit(track: Track): Promise<void> {
   if (editingId.value !== track.id) return
-  const raw = editingValue.value.trim()
+  const n = parseEditingValue()
   editingId.value = null
-  const n = Number(raw)
-  if (raw === '' || !Number.isInteger(n) || n < 0 || n === track.playCount) return
+  if (n === null || !Number.isInteger(n) || n < 0 || n === track.playCount) return
   await library.setPlayCount(track.id, n)
 }
 </script>

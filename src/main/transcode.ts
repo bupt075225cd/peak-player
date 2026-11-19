@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { VariantResult } from '../shared/types'
@@ -9,8 +9,9 @@ import type { VariantResult } from '../shared/types'
 // 质量远好于 Chromium 内置的 WSOLA 时间伸缩（后者在 0.8x 会有明显金属感）。
 
 // rubberband 参数：固定 tempo 变速、保持音高，其余选项偏向人声质量
+// 注意必须以滤镜名开头（rubberband=），否则 ffmpeg 会把 tempo 当成滤镜名直接报错
 const RUBBERBAND = [
-  'tempo=%RATE%',
+  'rubberband=tempo=%RATE%',
   'pitch=1',
   'transients=crisp',
   'detector=compound',
@@ -78,6 +79,13 @@ function probeDuration(ffmpeg: string, input: string): Promise<number> {
       resolve(Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]))
     })
   })
+}
+
+// 主进程侧探测曲目时长：导入后从未播放过的曲目 duration 为 0，
+// 改次数时没有换算依据，这里用随包的 ffmpeg 补采一次（失败返回 0）
+export async function probeAudioDuration(input: string): Promise<number> {
+  const seconds = await probeDuration(resolveFfmpegPath(), input)
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : 0
 }
 
 export async function ensureVariant(
@@ -158,10 +166,30 @@ export function prepareVariant(
   rate: number,
   onProgress?: ProgressFn
 ): Promise<VariantResult> {
+  const started = Date.now()
   return ensureVariant(input, rate, onProgress).then(
-    (path): VariantResult => ({ path }),
-    (err: Error): VariantResult => ({ error: err.message })
+    (path): VariantResult => {
+      registerLog(`ok  rate=${rate} ${Date.now() - started}ms ${path}`)
+      return { path }
+    },
+    (err: Error): VariantResult => {
+      // 失败时界面只会退回内置伸缩，这里留痕便于排查（%APPDATA%/peak-player/transcode.log）
+      registerLog(`fail rate=${rate} ffmpeg=${resolveFfmpegPath()} input=${input} :: ${err.message}`)
+      return { error: err.message }
+    }
   )
+}
+
+// 简单的追加日志，失败不影响主流程
+export function registerLog(message: string): void {
+  try {
+    appendFileSync(
+      join(app.getPath('userData'), 'transcode.log'),
+      `[${new Date().toISOString()}] ${message}\n`
+    )
+  } catch {
+    // 日志写不进去就算了
+  }
 }
 
 // 启动时清理：先删过期文件，再按最近访问时间删到总量上限内

@@ -9,6 +9,8 @@ export interface Track {
   sourceType: SourceType
   playCount: number
   totalSeconds: number
+  // 曲目真实时长（秒），播放时采集；改次数时按它换算用时
+  duration: number
 }
 
 export interface DailyUsage {

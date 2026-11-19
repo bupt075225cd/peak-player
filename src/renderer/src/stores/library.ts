@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Track } from '../../../shared/types'
+import { useStatsStore } from './stats'
 
 export const useLibraryStore = defineStore('library', () => {
   const tracks = ref<Track[]>([])
@@ -22,6 +23,10 @@ export const useLibraryStore = defineStore('library', () => {
   async function setPlayCount(id: string, count: number): Promise<void> {
     await window.api.updateTrack(id, { playCount: count })
     syncPlayCount(id, count)
+    // 改次数会联动用时与时长，统计页/排行榜需要同步刷新
+    const stats = useStatsStore()
+    await Promise.all([stats.refreshWeekly(), stats.refreshRanking()])
+    await refresh()
   }
 
   // 播放结束后由 player 调用：只改动对应行，避免整表重查导致当前播放状态丢失

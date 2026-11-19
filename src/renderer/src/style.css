@@ -254,8 +254,14 @@ tbody tr:hover {
   font-variant-numeric: tabular-nums;
 }
 
-.player-bar .prep.warn {
-  color: #e5a13a;
+/* 播放失败提示：媒体元素加载/解码出错时不再静默 */
+.player-bar .error {
+  font-size: 13px;
+  color: #ff6b6b;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chart {

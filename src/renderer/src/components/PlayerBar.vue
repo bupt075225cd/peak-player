@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { player, playerState } from '../core/player'
 
-const rateOptions = [0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
+const rateOptions = [0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
 
 const loopOrder = ['none', 'single', 'all'] as const
 const loopLabels: Record<string, string> = {
@@ -47,8 +47,8 @@ function fmt(s: number): string {
     <span v-if="playerState.preparing" class="prep">
       正在生成 {{ playerState.rate }}x 音频 {{ Math.round(playerState.progress * 100) }}%
     </span>
-    <span v-else-if="playerState.fallback && playerState.rate !== 1" class="prep warn">
-      内置变速（音质略差）
+    <span v-if="playerState.error" class="error" :title="playerState.error">
+      {{ playerState.error }}
     </span>
     <div class="time">{{ fmt(playerState.currentTime) }} / {{ fmt(playerState.duration) }}</div>
   </div>

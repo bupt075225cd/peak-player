@@ -19,6 +19,15 @@ win:
   target:
     - nsis
   icon: resources/icon.png
+nsis:
+  # 向导式安装：允许用户选择安装目录
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  # 默认装到当前用户目录，无需管理员权限
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Peak Player
 mac:
   target:
     - dmg
