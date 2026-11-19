@@ -4,23 +4,10 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSyn
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { VariantResult } from '../shared/types'
+import { buildFilter, parseFfmpegDuration, parseProgress, progressRatio } from './ffmpeg-args'
 
 // 变速预渲染：用 ffmpeg 的 rubberband 滤镜离线生成「变速不变调」的文件，
 // 质量远好于 Chromium 内置的 WSOLA 时间伸缩（后者在 0.8x 会有明显金属感）。
-
-// rubberband 参数：固定 tempo 变速、保持音高，其余选项偏向人声质量
-// 注意必须以滤镜名开头（rubberband=），否则 ffmpeg 会把 tempo 当成滤镜名直接报错
-const RUBBERBAND = [
-  'rubberband=tempo=%RATE%',
-  'pitch=1',
-  'transients=crisp',
-  'detector=compound',
-  'phase=laminar',
-  'window=standard',
-  'formant=preserved',
-  'pitchq=quality',
-  'channels=together'
-].join(':')
 
 // 缓存上限：超过后按最久未使用优先删除
 const CACHE_MAX_BYTES = 2 * 1024 ** 3
@@ -103,7 +90,7 @@ export async function ensureVariant(
 
   const ffmpeg = resolveFfmpegPath()
   const total = await probeDuration(ffmpeg, input)
-  const filter = RUBBERBAND.replace('%RATE%', rate.toFixed(4))
+  const filter = buildFilter(rate)
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(
@@ -135,13 +122,10 @@ export async function ensureVariant(
     })
     child.stdout.on('data', (chunk) => {
       // 兼容不同 ffmpeg 版本：out_time_us / out_time_ms（历史上都按微秒输出）
-      // 输出时长 ≈ 源时长 / rate，进度要以输出时长为分母
-      const m = /out_time_(?:us|ms)=(\d+)/.exec(chunk.toString())
-      if (m && total > 0) {
-        const expected = total / rate
-        const done = Number(m[1]) / 1e6
-        onProgress?.(Math.min(0.99, done / expected))
-      }
+      const done = parseProgress(chunk.toString())
+      if (done === null) return
+      const ratio = progressRatio(done, total, rate)
+      if (ratio !== null) onProgress?.(ratio)
     })
     child.on('error', (e) => reject(new Error(`无法启动 ffmpeg：${e.message}`)))
     child.on('close', (code) => {

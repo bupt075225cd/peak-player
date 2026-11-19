@@ -2,6 +2,13 @@ import { reactive } from 'vue'
 import { resolveTrackUrl } from '../../../shared/track-url'
 import type { LoopMode, Track } from '../../../shared/types'
 import { useLibraryStore } from '../stores/library'
+import {
+  needsDurationReport,
+  resolvePlaybackRate,
+  toDisplayDuration,
+  toDisplayTime,
+  toSourceTime
+} from './time-mapping'
 
 export type { LoopMode }
 
@@ -53,7 +60,7 @@ class PlayerEngine {
       this.stopTimer()
     })
     this.audio.addEventListener('timeupdate', () => {
-      playerState.currentTime = this.audio.currentTime * this.srcRate
+      playerState.currentTime = toDisplayTime(this.audio.currentTime, this.srcRate)
     })
     // loadedmetadata 阶段 duration 可能是 Infinity（长度未确定），
     // 用 durationchange 兜底，并只接受有限值
@@ -141,7 +148,7 @@ class PlayerEngine {
   seek(seconds: number): void {
     if (!this.audio.src) return
     const target = Math.max(0, seconds)
-    this.audio.currentTime = target / this.srcRate
+    this.audio.currentTime = toSourceTime(target, this.srcRate)
     playerState.currentTime = target
   }
 
@@ -157,8 +164,8 @@ class PlayerEngine {
     this.audio.load()
     // load() 会把 playbackRate 重置为 defaultPlaybackRate(1)，
     // 退回内置伸缩时必须重新设置，否则降速完全不生效
-    this.audio.playbackRate = this.srcRate === 1 ? playerState.rate : 1
-    if (srcTime > 0) this.audio.currentTime = srcTime / this.srcRate
+    this.audio.playbackRate = resolvePlaybackRate(this.srcRate, playerState.rate)
+    if (srcTime > 0) this.audio.currentTime = toSourceTime(srcTime, this.srcRate)
   }
 
   private async resolveUrl(track: Track): Promise<string | null> {

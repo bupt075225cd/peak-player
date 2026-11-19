@@ -15,6 +15,7 @@ import {
   updateTrack
 } from './db'
 import { prepareVariant, probeAudioDuration } from './transcode'
+import { ensureTrackDuration } from './track-duration'
 import { getMainWindow } from './window'
 
 // 仅保留 Chromium 内置可解码的格式；.wma 无解码器，导入后无法播放
@@ -55,7 +56,9 @@ export function registerIpc(): void {
   ipcMain.handle(
     'tracks:update',
     async (_e, id: string, patch: Partial<Pick<Track, 'playCount'>>): Promise<void> => {
-      if (patch.playCount !== undefined) await ensureTrackDuration(id)
+      if (patch.playCount !== undefined) {
+        await ensureTrackDuration(id, { getTrack, probeAudioDuration, setTrackDuration })
+      }
       updateTrack(id, patch)
     }
   )
@@ -89,12 +92,4 @@ export function registerIpc(): void {
       })
     }
   )
-}
-
-// duration 未知时补采一次（失败保持 0，改次数只是不联动用时）
-async function ensureTrackDuration(id: string): Promise<void> {
-  const track = getTrack(id)
-  if (!track || track.duration > 0) return
-  const seconds = await probeAudioDuration(track.path)
-  if (seconds > 0) setTrackDuration(id, seconds)
 }
