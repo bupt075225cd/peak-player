@@ -149,12 +149,13 @@ describe('media:// 协议（真实文件）', () => {
     expect(res.status).toBe(400)
   })
 
+  // 名字里只放「各平台文件系统都合法」的字符：? * : " < > | 在 Windows 上不能建文件
   it.each([
     '中文 歌名.mp3',
     'with space.mp3',
     'hash#tag.mp3',
-    'query?mark.mp3',
     'amp&sand.mp3',
+    "quote'single.mp3",
     '音节 ñ ǔ 🎵.flac'
   ])('特殊字符文件名可正常取到内容：%s', async (name) => {
     const file = tmp.file(name)
@@ -165,6 +166,42 @@ describe('media:// 协议（真实文件）', () => {
 
     expect(res.status).toBe(200)
     expect(await bodyOf(res)).toEqual(pattern)
+  })
+
+  // Windows 不允许 ? 出现在文件名里，真实落盘只在 POSIX 上验证
+  it.skipIf(process.platform === 'win32')('含 ? 的文件名在 POSIX 上可正常取到内容', async () => {
+    const file = tmp.file('query?mark.mp3')
+    const pattern = makePatternBuffer(128)
+    writeFileSync(file, pattern)
+
+    const res = await createMediaResponse(mediaRequest(file))
+
+    expect(res.status).toBe(200)
+    expect(await bodyOf(res)).toEqual(pattern)
+  })
+
+  // 平台无关：用注入的 fs 验证「URL 编码 → 还原成原始路径」不会在 ? 处截断
+  it('路径含 ? 时 URL 编码往返不失真', async () => {
+    const filePath = join(tmp.path, 'query?mark.mp3')
+    const statCalls: string[] = []
+
+    const res = await createMediaResponse(mediaRequest(filePath), {
+      stat: async (p) => {
+        statCalls.push(p)
+        return { isFile: () => true, size: 3 }
+      },
+      createStream: () =>
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new Uint8Array([7, 8, 9]))
+            controller.close()
+          }
+        })
+    })
+
+    expect(statCalls).toEqual([filePath])
+    expect(res.status).toBe(200)
+    expect([...((await bodyOf(res)) as Buffer)]).toEqual([7, 8, 9])
   })
 
   it('真实 WAV 文件按字节完整返回', async () => {
