@@ -17,7 +17,7 @@ env:
 
 jobs:
   build:
-    name: lint / test / build / package (windows)
+    name: lint / test / coverage / build / e2e / package (windows)
     runs-on: windows-latest
 
     steps:
