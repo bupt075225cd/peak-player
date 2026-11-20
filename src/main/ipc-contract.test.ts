@@ -1,10 +1,20 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createIpcHandlers, type IpcDeps } from './ipc'
 
 // 契约测试：main 与 preload 之间的通道名只靠字符串约定，
 // 漏注册一侧不会编译报错，只会在运行时静默 reject
 // （audio:variant 就曾这样：preload 在调用，main 从未 handle）。
+//
+// 通道表来自 createIpcHandlers() 的真实返回值（而非正则扫源码），
+// 这样重构注册方式也不会让测试空跑。
+
+vi.mock('electron', () => ({
+  app: { getPath: () => '/tmp/peak-contract', isPackaged: false, getAppPath: () => process.cwd() },
+  dialog: { showOpenDialog: vi.fn() },
+  ipcMain: { handle: vi.fn() }
+}))
 
 const ROOT = process.cwd()
 const read = (relative: string): string => readFileSync(join(ROOT, relative), 'utf8')
@@ -12,7 +22,6 @@ const extract = (source: string, pattern: RegExp): string[] =>
   [...source.matchAll(pattern)].map((matched) => matched[1])
 
 const PRELOAD = read('src/preload/index.ts')
-const IPC = read('src/main/ipc.ts')
 const MAIN_FILES = [
   'src/main/index.ts',
   'src/main/ipc.ts',
@@ -21,10 +30,29 @@ const MAIN_FILES = [
   'src/main/transcode.ts'
 ]
 
+function stubDeps(): IpcDeps {
+  return {
+    pickAudioFiles: async () => null,
+    isSupportedAudio: () => true,
+    listTracks: () => [],
+    addTracks: () => 0,
+    getTrack: () => undefined,
+    updateTrack: () => {},
+    incrementCount: () => 0,
+    setTrackDuration: () => {},
+    addUsage: () => {},
+    getWeeklyUsage: () => [],
+    getRanking: () => [],
+    ensureTrackDuration: async () => 0,
+    prepareVariant: async () => ({ path: '/cache/a.flac' }),
+    newId: () => 'id'
+  }
+}
+
 describe('IPC 通道契约', () => {
   const invoked = extract(PRELOAD, /ipcRenderer\.invoke\(\s*'([^']+)'/g)
-  const handled = extract(IPC, /ipcMain\.handle\(\s*'([^']+)'/g)
   const listened = extract(PRELOAD, /ipcRenderer\.on\(\s*'([^']+)'/g)
+  const handled = Object.keys(createIpcHandlers(stubDeps()))
 
   it('能解析到通道（防止正则失效后测试空跑）', () => {
     expect(invoked.length).toBeGreaterThan(0)

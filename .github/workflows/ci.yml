@@ -67,8 +67,29 @@ jobs:
       - name: Build (electron-vite)
         run: npm run build
 
+      # 直接在构建产物上跑真实 Electron（复用上一步的 out/，不重复构建）。
+      # Windows runner 有桌面会话，不需要 xvfb；Linux 上需 `xvfb-run -a npm run test:e2e`。
+      # 失败时保留 trace 便于回放：npx playwright show-trace <trace.zip>
+      - name: E2E (Playwright + Electron)
+        run: npx playwright test
+
+      - name: Upload E2E artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report-${{ github.sha }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+
       - name: Package Windows installer
         run: npm run package:win
+
+      # package:win 末尾已含一次冒烟；这里显式再跑一次，避免脚本被改动后漏校验。
+      # 校验内容：包内 resources/bin/ffmpeg.exe 存在、体积正常、可执行且带 rubberband。
+      - name: Verify packaged ffmpeg
+        run: npm run check:package
 
       - name: Upload installer
         uses: actions/upload-artifact@v4

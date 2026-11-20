@@ -74,7 +74,7 @@ for (const [name, floor] of Object.entries(modules)) {
 }
 
 const pad = (text, width) => String(text).padEnd(width)
-console.log('\n覆盖率基线校验（基线 = 实测值下浮 5 个百分点）')
+console.log('\n覆盖率基线校验（基线 = 实测值下浮 2 个百分点）')
 console.log(`${pad('模块', 28)}${pad('语句', 10)}${pad('分支', 10)}${pad('函数', 10)}${pad('行', 10)}判定`)
 for (const { name, pct, floor, ok } of rows) {
   const cell = (metric) => pad(`${pct[metric]}`, 10)

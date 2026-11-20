@@ -73,25 +73,52 @@ export async function probeAudioDuration(input: string): Promise<number> {
   return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : 0
 }
 
+// 可注入的环境：缓存目录、ffmpeg 路径、spawn 与时长探测。
+// 生产用默认实现；集成测试传入临时目录 + 真实 ffmpeg，就能跑完整转码链路。
+export interface TranscodeEnv {
+  ffmpegPath: () => string
+  outputFor: (input: string, rate: number) => string
+  spawnProcess: typeof spawn
+  probe: (ffmpeg: string, input: string) => Promise<number>
+}
+
+export const defaultTranscodeEnv: TranscodeEnv = {
+  ffmpegPath: resolveFfmpegPath,
+  outputFor: variantFile,
+  spawnProcess: spawn,
+  probe: probeDuration
+}
+
 export async function ensureVariant(
   input: string,
   rate: number,
   onProgress?: ProgressFn
 ): Promise<string> {
+  return ensureVariantWith(input, rate, onProgress, defaultTranscodeEnv)
+}
+
+export async function ensureVariantWith(
+  input: string,
+  rate: number,
+  onProgress: ProgressFn | undefined,
+  env: TranscodeEnv
+): Promise<string> {
   if (!existsSync(input)) throw new Error(`文件不存在：${input}`)
 
-  const out = variantFile(input, rate)
+  const out = env.outputFor(input, rate)
   if (isUsableVariant(usableFileSize(out))) {
     onProgress?.(1)
     return out
   }
 
-  const ffmpeg = resolveFfmpegPath()
-  const total = await probeDuration(ffmpeg, input)
+  const ffmpeg = env.ffmpegPath()
+  const total = await env.probe(ffmpeg, input)
   const filter = buildFilter(rate)
 
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(ffmpeg, buildTranscodeArgs(input, filter, out), { windowsHide: true })
+    const child = env.spawnProcess(ffmpeg, buildTranscodeArgs(input, filter, out), {
+      windowsHide: true
+    })
 
     let stderr = ''
     child.stderr.on('data', (chunk) => {

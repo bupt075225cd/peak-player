@@ -48,15 +48,24 @@ function getDb(): Database.Database {
 }
 
 // ---- 歌曲 ----
+// 按 path 去重：同一首文件（本地绝对路径 / 远程对象键）只入库一次。
+// 不能只靠主键 id —— 每次导入都会生成新的 UUID，重复导入会堆出同名的多行。
+// 这里在写库时做判定，而不是加 UNIQUE 索引：老库里可能已有重复行，
+// 建唯一索引会直接失败，需要在迁移里做破坏性清洗，代价不值得。
 export function addTracks(items: Track[]): number {
   const d = getDb()
+  const exists = d.prepare('SELECT 1 FROM tracks WHERE path = ?')
   const stmt = d.prepare(`
     INSERT OR IGNORE INTO tracks (id, title, path, source_type, play_count, total_seconds, duration)
     VALUES (@id, @title, @path, @sourceType, @playCount, @totalSeconds, @duration)
   `)
   const tx = d.transaction((rows: Track[]) => {
     let n = 0
-    for (const r of rows) n += stmt.run({ ...r, duration: r.duration ?? 0 }).changes
+    for (const r of rows) {
+      // 同一次导入里也可能出现重复路径（对话框选重），所以在事务内逐条判定
+      if (exists.get(r.path)) continue
+      n += stmt.run({ ...r, duration: r.duration ?? 0 }).changes
+    }
     return n
   })
   return tx(items)

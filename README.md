@@ -75,11 +75,26 @@ npm run typecheck
 # 构建（产出到 out/）
 npm run build
 
-# 打包安装包
+# 打包安装包（末尾自动执行打包冒烟，见下）
 npm run package:win     # Windows (nsis)
 npm run package:mac     # macOS (dmg)
 npm run package:linux   # Linux (AppImage)
 ```
+
+### 打包冒烟
+
+`ffmpeg` 二进制不进仓库，由 `scripts/fetch-ffmpeg.mjs` 在打包前下载，再由
+`extraResources` 拷进包内 `resources/bin/`。这一步一旦被跳过（直接调 `electron-builder`）、
+平台参数写错（macOS 包塞了 win32 二进制）或配置被改动，`electron-builder`
+通常只 warn 一句照样出包，用户装完才发现变速不可用。
+
+```bash
+# 单独校验已有产物（release/ 下必须已有 *-unpacked 目录）
+npm run check:package
+```
+
+校验内容：包内 `resources/bin/ffmpeg(.exe)` 存在、体积 > 1MB、宿主平台下能执行 `-version`、
+`-filters` 含 `rubberband`。`package:win|mac|linux` 末尾自动执行，CI 也会在打包后单独跑一次。
 
 ## 单元测试
 
@@ -112,6 +127,15 @@ npm run package:linux   # Linux (AppImage)
 
 - `src/shared/track-url.test.ts` — 音源 URL 解析
 
+**集成测试**（`test/integration/`，跨模块 + 真实外部资源）
+
+- `media-protocol.test.ts` — 真实文件经 `media://` 的 200/206/416/404/400、字节偏移、特殊字符路径
+- `ipc-handlers.test.ts` — handler 集合与 preload 通道对齐、导入过滤、进度回传、sender 销毁保护
+- `db-usage-chain.test.ts` — 真实 SQLite 文件 + `tracks:update` → 补采时长 → 联动用时统计
+- `transcode.test.ts` — 真实 ffmpeg + rubberband：产物可解码、缓存命中、半成品清理（无 ffmpeg 时跳过）
+- `player-engine.test.ts` — 假 Audio 驱动的播放状态机：预渲染/降级、时间轴换算、循环计数、计时结算
+- `package-smoke.test.ts` — 打包配置（`extraResources` / asar 排除）与产物冒烟脚本的判定逻辑
+
 ```bash
 # 运行测试
 npm test
@@ -135,16 +159,16 @@ npm run check:coverage
 ### 覆盖率基线
 
 `scripts/coverage-baseline.json` 记录各模块的下限，取值是 2026-11-19 的实测覆盖率
-下浮 5 个百分点（覆盖率为 0 的模块不设基线）：
+下浮 2 个百分点（覆盖率为 0 的模块不设基线）：
 
-| 模块 | 语句 | 分支 | 函数 | 行 |
-|---|---|---|---|---|
-| all | 35.99 | 85.75 | 79.78 | 35.99 |
-| `src/main/` | 49.41 | 84.14 | 84.09 | 49.41 |
-| `src/shared/` | 95 | 95 | 95 | 95 |
-| `src/renderer/src/core/` | 17.31 | 92.91 | 86.66 | 17.31 |
-| `src/renderer/src/stores/` | 95 | 95 | 95 | 95 |
-| `src/renderer/src/utils/` | 95 | 95 | 95 | 95 |
+| 模块 | 语句 | 分支 | 函数 | 行 | 实测（2026-11-19） |
+|---|---|---|---|---|---|
+| all | 65.23 | 90.31 | 83.03 | 65.23 | 67.23 / 92.31 / 85.03 / 67.23 |
+| `src/main/` | 76.81 | 90.64 | 83.06 | 76.81 | 78.81 / 92.64 / 85.06 / 78.81 |
+| `src/shared/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
+| `src/renderer/src/core/` | 93.71 | 90.97 | 92.29 | 93.71 | 95.71 / 92.97 / 94.29 / 95.71 |
+| `src/renderer/src/stores/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
+| `src/renderer/src/utils/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
 
 `pre-commit`、`pre-push` 与 CI（`.github/workflows/ci.yml`）都执行
 `npm run test:coverage` + `npm run check:coverage`，任一模块的任一指标低于基线时，
@@ -153,8 +177,30 @@ npm run check:coverage
 需要更新基线时：先跑 `npm run test:coverage` 并查看 `coverage/index.html`，确认变化是有意的，
 再改 `scripts/coverage-baseline.json` 并在提交信息里写明原因。
 
-> 注意：整体语句覆盖率被 `.vue` 与入口文件（均为 0%）拉低到 41% 左右，
+> 注意：整体语句覆盖率仍被 `.vue` 组件与入口文件（均为 0%）拉低，
 > 判断改动是否退化应看模块级数字，不要只盯 `all`。
+
+## 端到端测试
+
+用 Playwright 驱动**真实 Electron 进程**（主进程 + 渲染进程 + `media://` + SQLite + ffmpeg），
+覆盖单元/集成测试触达不到的链路：窗口生命周期、托盘通道、重启持久化、单实例、真实音频解码。
+
+```bash
+# E2E 只驱动 Electron 自带的 Chromium，不需要 Playwright 下载浏览器
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install
+
+# 构建 + 跑 E2E
+npm run test:e2e
+
+# 复用已有 out/ 直接跑
+npx playwright test
+```
+
+- 每个用例独占临时 `userData` 与音频素材（运行时生成 WAV，不入库），互不污染
+- `dialog.showOpenDialog` 在主进程内被替换，无需人工选文件
+- 无 ffmpeg 时变速用例自动降级断言（不报错、仍可播）；有 ffmpeg 时走真实预渲染
+- Linux 无桌面环境需 `xvfb-run -a npm run test:e2e`；Windows/macOS 直接运行
+- 失败产物在 `test-results/`、`playwright-report/`（已 gitignore），可用 `npx playwright show-trace` 回放
 
 ## 架构说明
 
@@ -206,7 +252,8 @@ CREATE TABLE tracks (
   path          TEXT NOT NULL,          -- 本地绝对路径 或 远程对象键
   source_type   TEXT NOT NULL DEFAULT 'local',  -- 'local' | 'remote'
   play_count    INTEGER NOT NULL DEFAULT 0,     -- 播放次数（可手动改）
-  total_seconds INTEGER NOT NULL DEFAULT 0      -- 累计收听时长
+  total_seconds INTEGER NOT NULL DEFAULT 0,     -- 累计收听时长
+  duration      INTEGER NOT NULL DEFAULT 0      -- 曲目真实时长（播放时采集，改次数时换算用时）
 );
 
 -- 每日用时表
@@ -215,6 +262,10 @@ CREATE TABLE daily_usage (
   seconds INTEGER NOT NULL DEFAULT 0
 );
 ```
+
+> 入库按 `path` 去重：同一文件重复导入不会新增行（每次导入都会生成新的 `id`，
+> 只靠主键挡不住）。判定在 `addTracks` 的事务内完成，因此同一次导入里重复选中的文件
+> 也只会入库一次。老库里此前产生的重复行不会被自动清理。
 
 ## 扩展指南：接入对象存储
 

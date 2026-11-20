@@ -4,6 +4,10 @@ dist/
 release/
 coverage/
 *.log
+
+# E2E（Playwright）产物
+test-results/
+playwright-report/
 .DS_Store
 *.local
 

@@ -21,10 +21,12 @@ import {
 } from './db'
 
 function makeTrack(overrides: Partial<Track>): Track {
+  const id = overrides.id ?? '1'
   return {
-    id: '1',
+    id,
     title: 'song',
-    path: '/music/song.mp3',
+    // 默认路径按 id 派生：addTracks 现在按 path 去重，同路径会被判为同一首
+    path: `/music/${id}.mp3`,
     sourceType: 'local',
     playCount: 0,
     totalSeconds: 0,
@@ -53,6 +55,34 @@ describe('addTracks / listTracks', () => {
   it('按标题升序排列', () => {
     addTracks([makeTrack({ id: '2', title: 'Zebra' }), makeTrack({ id: '1', title: 'Apple' })])
     expect(listTracks().map((t) => t.title)).toEqual(['Apple', 'Zebra'])
+  })
+
+  it('同一路径重复导入不新增行（id 每次都变也一样）', () => {
+    addTracks([makeTrack({ id: '1', path: '/music/a.mp3' })])
+    const n = addTracks([makeTrack({ id: '2', path: '/music/a.mp3' })])
+
+    expect(n).toBe(0)
+    expect(listTracks()).toHaveLength(1)
+    // 保留首次导入的 id，播放次数等历史数据不受影响
+    expect(listTracks()[0]!.id).toBe('1')
+  })
+
+  it('同一次导入里的重复路径只保留第一条', () => {
+    const n = addTracks([
+      makeTrack({ id: '1', path: '/music/dup.mp3' }),
+      makeTrack({ id: '2', path: '/music/dup.mp3' })
+    ])
+
+    expect(n).toBe(1)
+    expect(listTracks()).toHaveLength(1)
+  })
+
+  it('不同路径但同名文件可以共存', () => {
+    addTracks([
+      makeTrack({ id: '1', title: 'song', path: '/a/song.mp3' }),
+      makeTrack({ id: '2', title: 'song', path: '/b/song.mp3' })
+    ])
+    expect(listTracks()).toHaveLength(2)
   })
 })
 
