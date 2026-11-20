@@ -146,8 +146,9 @@ npm run check:coverage
 | `src/renderer/src/stores/` | 95 | 95 | 95 | 95 |
 | `src/renderer/src/utils/` | 95 | 95 | 95 | 95 |
 
-`pre-commit` 与 `pre-push` 都执行 `npm run test:coverage && npm run check:coverage`，
-任一模块的任一指标低于基线，提交/推送会被中断。
+`pre-commit`、`pre-push` 与 CI（`.github/workflows/ci.yml`）都执行
+`npm run test:coverage` + `npm run check:coverage`，任一模块的任一指标低于基线时，
+提交、推送和 CI 构建都会被中断。
 
 需要更新基线时：先跑 `npm run test:coverage` 并查看 `coverage/index.html`，确认变化是有意的，
 再改 `scripts/coverage-baseline.json` 并在提交信息里写明原因。

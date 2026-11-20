@@ -41,7 +41,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 前三步与 .husky/pre-push 对应；Windows 安装包只在 CI 里打
+      # 与 .husky/pre-push 一致：静态检查 → 覆盖率与基线 → 编译；
+      # Windows 安装包只在 CI 里打
       - name: Static check (tsc + vue-tsc)
         run: npm run lint
 
@@ -49,6 +50,11 @@ jobs:
       # 与 install-app-deps 重建后的 better-sqlite3 ABI 一致
       - name: Unit tests with coverage
         run: npm run test:coverage
+
+      # 与本地钩子同一份基线（scripts/coverage-baseline.json），
+      # 任一模块低于基线即让 job 失败
+      - name: Check coverage baseline
+        run: npm run check:coverage
 
       - name: Upload coverage report
         if: always()
