@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import NowPlayingView from './components/NowPlayingView.vue'
 import PlayerBar from './components/PlayerBar.vue'
-import { player } from './core/player'
+import { player, playerState } from './core/player'
 import { useLibraryStore } from './stores/library'
+import { useLyricsStore } from './stores/lyrics'
 import { useStatsStore } from './stores/stats'
 import LibraryView from './views/LibraryView.vue'
 import RankingView from './views/RankingView.vue'
@@ -12,13 +14,22 @@ type ViewKey = 'library' | 'ranking' | 'stats'
 
 const library = useLibraryStore()
 const stats = useStatsStore()
+const lyrics = useLyricsStore()
 const currentView = ref<ViewKey>('library')
+const nowPlayingOpen = ref(false)
 
 function switchView(v: ViewKey): void {
   currentView.value = v
   if (v === 'ranking') void stats.refreshRanking()
   if (v === 'stats') void stats.refreshWeekly()
 }
+
+// 切歌即换歌词；歌词只是增强信息，加载失败由 store 内部吞掉
+watch(
+  () => playerState.current?.id,
+  () => void lyrics.load(playerState.current),
+  { immediate: true }
+)
 
 onMounted(() => {
   void library.refresh()
@@ -48,6 +59,7 @@ onMounted(() => {
       <RankingView v-else-if="currentView === 'ranking'" />
       <StatsView v-else />
     </main>
-    <PlayerBar />
+    <PlayerBar @open-now-playing="nowPlayingOpen = true" />
+    <NowPlayingView :open="nowPlayingOpen" @close="nowPlayingOpen = false" />
   </div>
 </template>

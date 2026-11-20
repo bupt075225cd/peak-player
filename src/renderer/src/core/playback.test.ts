@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  LOOP_LABELS,
+  LOOP_MODES,
   RATE_MAX,
   RATE_MIN,
   acceptsProgress,
@@ -7,7 +9,8 @@ import {
   elapsedSeconds,
   endedAction,
   formatMediaError,
-  needsVariant
+  needsVariant,
+  nextLoopMode
 } from './playback'
 
 describe('clampRate', () => {
@@ -103,5 +106,17 @@ describe('endedAction', () => {
   it('顺序/列表循环交给外部', () => {
     expect(endedAction('none')).toBe('stop')
     expect(endedAction('all')).toBe('stop')
+  })
+})
+
+describe('循环模式切换', () => {
+  it('按顺序循环一圈', () => {
+    expect(nextLoopMode('none')).toBe('single')
+    expect(nextLoopMode('single')).toBe('all')
+    expect(nextLoopMode('all')).toBe('none')
+  })
+
+  it('三种模式都有可读文案', () => {
+    expect(LOOP_MODES.map((m) => LOOP_LABELS[m])).toEqual(['顺序播放', '单曲循环', '列表循环'])
   })
 })

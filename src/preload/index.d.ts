@@ -1,4 +1,11 @@
-import type { DailyUsage, RankingBy, Track } from '../shared/types'
+import type {
+  DailyUsage,
+  LyricDoc,
+  RankingBy,
+  Track,
+  VariantProgress,
+  VariantResult
+} from '../shared/types'
 
 export interface PeakPlayerApi {
   importFiles(): Promise<Track[]>
@@ -10,6 +17,7 @@ export interface PeakPlayerApi {
   getWeeklyUsage(days?: number): Promise<DailyUsage[]>
   getRanking(by: RankingBy): Promise<Track[]>
   prepareVariant(trackPath: string, rate: number): Promise<VariantResult>
+  getLyrics(trackPath: string): Promise<LyricDoc>
   onVariantProgress(cb: (p: VariantProgress) => void): () => void
   onTogglePlay(cb: () => void): () => void
 }

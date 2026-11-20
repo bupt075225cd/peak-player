@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   DailyUsage,
+  LyricDoc,
   RankingBy,
   Track,
   VariantProgress,
@@ -23,6 +24,8 @@ const api = {
   getRanking: (by: RankingBy): Promise<Track[]> => ipcRenderer.invoke('stats:ranking', by),
   prepareVariant: (trackPath: string, rate: number): Promise<VariantResult> =>
     ipcRenderer.invoke('audio:variant', trackPath, rate),
+  getLyrics: (trackPath: string): Promise<LyricDoc> =>
+    ipcRenderer.invoke('lyrics:get', trackPath),
   onVariantProgress: (cb: (p: VariantProgress) => void): (() => void) => {
     const listener = (_e: unknown, p: VariantProgress): void => cb(p)
     ipcRenderer.on('audio:variant-progress', listener)

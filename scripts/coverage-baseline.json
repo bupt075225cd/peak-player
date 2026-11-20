@@ -1,7 +1,5 @@
 {
-  "generatedAt": "2026-11-19",
-  "source": "npm run test:coverage（24 files / 285 tests）",
-  "rule": "以 2026-11-19 的实测覆盖率下浮 2 个百分点；CI 已把 fetch:ffmpeg 前置到单测之前，本机与 CI 的 ffmpeg 用例都会执行，两侧数字应保持一致。低于基线时 pre-commit、pre-push 与 CI 拦截",
+  "rule": "记录各模块覆盖率下限；CI 已把 fetch:ffmpeg 前置到单测之前，本机与 CI 的 ffmpeg 用例都会执行，两侧数字应保持一致。任一指标低于下限时 pre-commit、pre-push 与 CI 拦截，不得通过下调数值或缩小统计范围绕过",
   "modules": {
     "all": {
       "statements": 65.23,

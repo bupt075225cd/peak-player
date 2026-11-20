@@ -220,11 +220,51 @@ tbody tr:hover {
   padding: 0 24px;
 }
 
-.player-bar .title {
+/* 播放条左侧：标题 + 当前歌词两行，整块可点击展开全屏歌词 */
+.player-meta {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+}
+
+.player-meta:hover {
+  background: transparent;
+  opacity: 1;
+}
+
+.player-meta:hover .title {
+  color: var(--accent);
+}
+
+.player-meta .title {
+  max-width: 100%;
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.player-meta .title-lyric {
+  max-width: 100%;
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lyric-toggle {
+  flex-shrink: 0;
 }
 
 .player-bar select {
@@ -267,4 +307,315 @@ tbody tr:hover {
 .chart {
   width: 100%;
   height: 420px;
+}
+
+/* ---- 全屏「正在播放」：Apple Music 式歌词页 ---- */
+
+.now-playing {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 48px 26px;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* 无封面可用，用两团低透明度色光做背景，避免整屏死黑 */
+.now-playing-bg {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 28% 18%, rgba(79, 140, 255, 0.3), transparent 55%),
+    radial-gradient(circle at 76% 82%, rgba(152, 92, 255, 0.2), transparent 52%);
+  filter: blur(48px);
+  pointer-events: none;
+}
+
+.now-playing-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+}
+
+.np-heading {
+  min-width: 0;
+}
+
+.np-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--text-dim);
+}
+
+.np-title {
+  margin-top: 4px;
+  font-size: 26px;
+  font-weight: 700;
+  max-width: 68vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.np-close {
+  flex-shrink: 0;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+/* 歌词区 */
+.lyrics-panel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.lyrics-viewport {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  /* 上下渐隐，让滚动边界不显得生硬 */
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    #000 20%,
+    #000 80%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(180deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
+}
+
+.lyrics-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.lyrics-inner {
+  position: relative;
+  width: 100%;
+}
+
+.lyric-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 10px 24px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.32;
+  transform: scale(0.94);
+  transition:
+    opacity 0.32s ease,
+    transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.lyric-line.sung {
+  opacity: 0.5;
+}
+
+.lyric-line.active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.lyric-line:hover {
+  opacity: 0.7;
+}
+
+.lyric-main {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+
+/* 当前行用「已唱比例」做渐变扫光：需要增强型歌词，普通 LRC 也自然成立 */
+.lyric-line.active .lyric-main {
+  background-image: linear-gradient(
+    90deg,
+    var(--text) calc(var(--fill, 0) * 100%),
+    rgba(232, 233, 237, 0.4) 0
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lyric-sub {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
+
+.lyric-line.active .lyric-sub {
+  color: rgba(232, 233, 237, 0.78);
+}
+
+.lyrics-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 6vh;
+}
+
+.lyrics-empty-title {
+  font-size: 18px;
+  color: var(--text);
+}
+
+.lyrics-empty-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.lyrics-back {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* 底部控制区 */
+.now-playing-foot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.np-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np-range {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  cursor: pointer;
+}
+
+.np-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.np-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+}
+
+.np-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.np-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.np-play {
+  min-width: 96px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.np-rate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.np-rate select {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.np-hint {
+  text-align: center;
+  font-size: 12px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.np-error {
+  text-align: center;
+  font-size: 12px;
+  color: #ff6b6b;
+}
+
+/* 浮层进出场 */
+.now-playing-enter-active,
+.now-playing-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.now-playing-enter-from,
+.now-playing-leave-to {
+  opacity: 0;
+  transform: translateY(14px) scale(0.995);
+}
+
+@media (max-width: 760px) {
+  .now-playing {
+    padding: 20px 20px 18px;
+  }
+
+  .np-title {
+    font-size: 20px;
+  }
+
+  .lyric-main {
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lyric-line {
+    transition: none;
+  }
+
+  .now-playing-enter-active,
+  .now-playing-leave-active {
+    transition: none;
+  }
 }

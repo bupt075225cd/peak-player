@@ -6,6 +6,23 @@ import type { LoopMode, SourceType } from '../../../shared/types'
 export const RATE_MIN = 0.7
 export const RATE_MAX = 1.5
 
+// 播放条与全屏歌词页共用的倍速选项，避免两处各写一份后漂移
+export const RATE_OPTIONS = [0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5] as const
+
+export const LOOP_MODES: readonly LoopMode[] = ['none', 'single', 'all']
+
+export const LOOP_LABELS: Record<LoopMode, string> = {
+  none: '顺序播放',
+  single: '单曲循环',
+  all: '列表循环'
+}
+
+// 循环切换顺序：顺序 → 单曲 → 列表 → 顺序
+export function nextLoopMode(mode: LoopMode): LoopMode {
+  const index = LOOP_MODES.indexOf(mode)
+  return LOOP_MODES[(index + 1) % LOOP_MODES.length]
+}
+
 // 越界与非数字都收敛到合法范围；NaN 会让 Math.min/max 一路穿透，
 // 直接用会让 playbackRate 变成 NaN 而静默失声
 export function clampRate(rate: number): number {

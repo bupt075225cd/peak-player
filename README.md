@@ -7,6 +7,7 @@
 - **本地播放**：本地音频文件播放，完全离线可用；通过音源抽象层预留对象存储扩展
 - **变速播放**：支持 0.8x ~ 1.5x 倍速，`preservesPitch` 保证变速不变调
 - **单曲循环 + 计数**：单曲循环模式播放完成自动计数 +1，次数支持手动修改
+- **歌词**：自动读取歌曲同目录同名 `.lrc`，全屏「正在播放」页居中滚动、当前行扫光、点击跳转
 - **排行榜**：按播放次数 / 收听时长排序
 - **用时统计**：近一周每日用时柱形图（ECharts）
 - **后台播放**：关闭窗口后进程驻留系统托盘，音频持续播放，禁用后台 CPU 节流
@@ -39,15 +40,17 @@ peak-player/
     │   ├── tray.ts       # 系统托盘
     │   ├── protocol.ts   # media:// 自定义协议
     │   ├── db.ts         # SQLite 封装
+    │   ├── lyrics.ts     # 同名 .lrc 探测、编码兜底、缓存
     │   ├── ipc.ts        # IPC 通道
     │   └── source.ts     # 音源抽象层（对象存储扩展点）
     ├── preload/          # contextBridge 安全桥接
     └── renderer/         # Vue 3 界面
         ├── core/             # 播放引擎（player）+ 纯函数（时间轴换算/播放决策）
+        ├── composables/      # 可单测的组件逻辑（歌词播放头/跟随滚动/进度拖动）
         ├── stores/           # Pinia 状态
-        ├── utils/            # 展示格式化与图表整形（纯函数）
+        ├── utils/            # 展示格式化、图表整形、歌词定位（纯函数）
         ├── views/            # 音乐库 / 排行榜 / 用时统计
-        └── components/       # 播放控制条
+        └── components/       # 播放控制条 / 歌词面板 / 全屏正在播放
 ```
 
 ## 环境要求
@@ -103,7 +106,9 @@ npm run check:package
 
 ## 单元测试
 
-使用 Vitest 编写单元测试，覆盖核心业务逻辑。原则是「先抽纯函数再测」，避免为测试挂载 Vue 组件。
+使用 Vitest 编写单元测试，覆盖核心业务逻辑。原则是「先抽纯函数再测」：能脱离 DOM 的
+计算与交互逻辑放在 `utils/`、`core/`、`composables/`，组件层只做绑定。少量组件测试用
+`happy-dom` 环境（文件头 `// @vitest-environment happy-dom`）挂载真实 `.vue`，验证事件接线。
 
 **主进程**
 
@@ -116,6 +121,7 @@ npm run check:package
 - `src/main/transcode-pure.test.ts` — 转码参数拼装、产物判定、错误与日志文案
 - `src/main/variant-cache.test.ts` — 变速缓存命名与清理策略
 - `src/main/track-duration.test.ts` — 时长采集结果的取整与校验
+- `src/main/lyrics.test.ts` — 同名 `.lrc` 路径探测、UTF-8/GBK/UTF-16 解码、体积上限与缓存失效
 - `src/main/audio-exts.test.ts` — 可导入音频扩展名白名单
 - `src/main/ipc-contract.test.ts` — IPC 通道契约
 
@@ -125,12 +131,23 @@ npm run check:package
 - `src/renderer/src/core/playback.test.ts` — 倍速钳制、降级判断、进度采纳、计时结算、循环动作
 - `src/renderer/src/utils/format.test.ts` — 时间/时长/倍速/进度展示与次数输入解析
 - `src/renderer/src/utils/chart.test.ts` — 用时统计图的数据整形与 option 构造
+- `src/renderer/src/utils/lyrics.test.ts` — 当前歌词行二分定位、行内进度、居中滚动位置
+- `src/renderer/src/composables/useLyricsPlayhead.test.ts` — 歌词 rAF 采样：播放/暂停/换源期跳过、启停幂等
+- `src/renderer/src/composables/useLyricFollow.test.ts` — 歌词自动跟随：居中滚动、手动浏览挂起、恢复与清理
+- `src/renderer/src/composables/useSeekDrag.test.ts` — 进度条拖动状态：拖动值、非法值收敛、松手才 seek
 - `src/renderer/src/stores/library.test.ts` — 音乐库 store
+- `src/renderer/src/stores/lyrics.test.ts` — 歌词 store：切歌清空、过期结果丢弃、IPC 失败降级
 - `src/renderer/src/stores/stats.test.ts` — 统计 store
+
+**组件**（`// @vitest-environment happy-dom`，真实挂载）
+
+- `src/renderer/src/components/LyricsPanel.test.ts` — 空态、当前行/已唱行标记、点击跳转、手动滚动挂起与回位、换歌复位
+- `src/renderer/src/components/NowPlayingView.test.ts` — 开关渲染、Esc 关闭、进度拖动、倍速切换、循环切换、预渲染/错误提示
 
 **共享**
 
 - `src/shared/track-url.test.ts` — 音源 URL 解析
+- `src/shared/lyrics.test.ts` — LRC 解析：时间戳格式、一行多时间戳、offset、双语合并与去重
 
 **集成测试**（`test/integration/`，跨模块 + 真实外部资源）
 
@@ -163,17 +180,16 @@ npm run check:coverage
 
 ### 覆盖率基线
 
-`scripts/coverage-baseline.json` 记录各模块的下限，取值是 2026-11-19 的实测覆盖率
-下浮 2 个百分点（覆盖率为 0 的模块不设基线）：
+`scripts/coverage-baseline.json` 记录各模块的下限（覆盖率为 0 的模块不设基线）：
 
-| 模块 | 语句 | 分支 | 函数 | 行 | 实测（2026-11-19） |
-|---|---|---|---|---|---|
-| all | 65.23 | 90.31 | 83.03 | 65.23 | 67.23 / 92.31 / 85.03 / 67.23 |
-| `src/main/` | 76.81 | 90.64 | 83.06 | 76.81 | 78.81 / 92.64 / 85.06 / 78.81 |
-| `src/shared/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
-| `src/renderer/src/core/` | 93.71 | 90.97 | 92.29 | 93.71 | 95.71 / 92.97 / 94.29 / 95.71 |
-| `src/renderer/src/stores/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
-| `src/renderer/src/utils/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
+| 模块 | 语句 | 分支 | 函数 | 行 |
+|---|---|---|---|---|
+| all | 65.23 | 90.31 | 83.03 | 65.23 |
+| `src/main/` | 76.81 | 90.64 | 83.06 | 76.81 |
+| `src/shared/` | 98 | 98 | 98 | 98 |
+| `src/renderer/src/core/` | 93.71 | 90.97 | 92.29 | 93.71 |
+| `src/renderer/src/stores/` | 98 | 98 | 98 | 98 |
+| `src/renderer/src/utils/` | 98 | 98 | 98 | 98 |
 
 > `transcode.test.ts` 与时长探测需要带 rubberband 的 ffmpeg，否则整组跳过、`src/main/`
 > 会掉约 6 个百分点。CI 因此在单测之前就执行 `node scripts/fetch-ffmpeg.mjs`
@@ -183,11 +199,12 @@ npm run check:coverage
 `npm run test:coverage` + `npm run check:coverage`，任一模块的任一指标低于基线时，
 提交、推送和 CI 构建都会被中断。
 
-需要更新基线时：先跑 `npm run test:coverage` 并查看 `coverage/index.html`，确认变化是有意的，
-再改 `scripts/coverage-baseline.json` 并在提交信息里写明原因。
+覆盖率不足时的正确做法是补充测试。不得以下调基线、调整阈值或缩小统计范围的方式让检查通过；
+基线文件属于受审配置，确需变更时必须单独提交，并附完整测量数据与评审结论，不能与功能改动混合提交。
 
-> 注意：整体语句覆盖率仍被 `.vue` 组件与入口文件（均为 0%）拉低，
-> 判断改动是否退化应看模块级数字，不要只盯 `all`。
+> 说明：歌词面板、全屏播放页已用 `happy-dom` 做挂载测试，纯逻辑则下沉到
+> `utils/`、`core/`、`composables/`。入口文件与其余展示组件仍无组件级测试，
+> 但 `all` 是实际门槛，不会因为模块级数字达标而豁免。
 
 ## 端到端测试
 
@@ -228,6 +245,15 @@ media://play?path=<encodeURIComponent(绝对路径)>
 ```
 
 主进程通过 `protocol.handle` 将请求映射到本地文件。
+
+### 歌词
+
+只读取歌曲同目录同名 `.lrc` 文件（`/music/歌名.mp3` → `/music/歌名.lrc`），完全离线、无新依赖：
+
+- 支持 `[mm:ss]` / `[mm:ss.xx]`、一行多时间戳、`[offset:±ms]`、同时间戳双语合并
+- 编码自动识别：UTF-8（含 BOM）、UTF-16 LE/BE、GBK
+- 点击播放条标题或「歌词」按钮打开全屏「正在播放」：当前行居中高亮、按行内进度扫光、点击任意行跳转，`Esc` 收起
+- 歌词时间轴与原速时间一致，变速播放由引擎换算，无需调整歌词
 
 ### 后台播放
 

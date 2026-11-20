@@ -34,6 +34,7 @@ function makeDeps(overrides: Partial<IpcDeps> = {}): IpcDeps {
     getRanking: () => [],
     ensureTrackDuration: async () => 0,
     prepareVariant: async () => ({ path: '/cache/a.flac' }),
+    loadLyrics: async () => ({ lines: [], offset: 0, source: 'none' }),
     newId: () => `id-${++seq}`,
     ...overrides
   }
@@ -47,6 +48,7 @@ describe('IPC 通道集合', () => {
     expect(Object.keys(handlers).sort()).toEqual(
       [
         'audio:variant',
+        'lyrics:get',
         'stats:ranking',
         'tracks:duration',
         'tracks:import',
@@ -186,6 +188,15 @@ describe('其余通道透传', () => {
     handlers['stats:ranking']!(event, 'duration')
 
     expect(getRanking).toHaveBeenCalledWith('duration')
+  })
+
+  it('lyrics:get 透传歌曲路径并返回歌词文档', async () => {
+    const doc = { lines: [{ time: 1, text: '第一句' }], offset: 0, source: 'sidecar' as const }
+    const loadLyrics = vi.fn(async () => doc)
+    const handlers = createIpcHandlers(makeDeps({ loadLyrics }))
+
+    await expect(handlers['lyrics:get']!(event, '/music/a.mp3')).resolves.toBe(doc)
+    expect(loadLyrics).toHaveBeenCalledWith('/music/a.mp3')
   })
 })
 

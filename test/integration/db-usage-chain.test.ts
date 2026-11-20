@@ -75,6 +75,7 @@ function buildHandlers(
     ensureTrackDuration: (id) =>
       ensureTrackDuration(id, { getTrack, probeAudioDuration: probeSpy, setTrackDuration }),
     prepareVariant: async () => ({ path: '/cache/x.flac' }),
+    loadLyrics: async () => ({ lines: [], offset: 0, source: 'none' }),
     newId: (() => {
       let n = 0
       return () => `gen-${++n}`

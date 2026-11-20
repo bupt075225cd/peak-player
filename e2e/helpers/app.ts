@@ -112,8 +112,9 @@ export function playerBar(page: Page) {
   return page.locator('.player-bar')
 }
 
+// 播放条第一个按钮是「标题/歌词」入口，按文案精确定位播放键
 export function playPauseButton(page: Page) {
-  return playerBar(page).locator('button').first()
+  return playerBar(page).getByRole('button', { name: /^(播放|暂停)$/ })
 }
 
 // 播放条上的「当前时间 / 总时长」文本

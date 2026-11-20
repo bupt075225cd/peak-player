@@ -1,27 +1,26 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { player, playerState } from '../core/player'
+import { LOOP_LABELS, RATE_OPTIONS, nextLoopMode } from '../core/playback'
+import { useLyricsStore } from '../stores/lyrics'
 import { formatClock, formatRateLabel, progressPercent } from '../utils/format'
+import { currentLyricText } from '../utils/lyrics'
 
-const rateOptions = [0.7, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5]
+const emit = defineEmits<{ openNowPlaying: [] }>()
 
-const loopOrder = ['none', 'single', 'all'] as const
-const loopLabels: Record<string, string> = {
-  none: '顺序播放',
-  single: '单曲循环',
-  all: '列表循环'
-}
+const lyrics = useLyricsStore()
 
 const title = computed(() => playerState.current?.title ?? '未在播放')
-const loopLabel = computed(() => loopLabels[playerState.loopMode])
+const loopLabel = computed(() => LOOP_LABELS[playerState.loopMode])
+// 播放条只需要 4Hz 的 currentTime，全屏歌词页才用 rAF 取精确进度
+const currentLyric = computed(() => currentLyricText(lyrics.lines, playerState.currentTime))
 
 function setRate(e: Event): void {
   void player.setRate(Number((e.target as HTMLSelectElement).value))
 }
 
 function cycleLoop(): void {
-  const idx = loopOrder.indexOf(playerState.loopMode)
-  player.loopMode = loopOrder[(idx + 1) % loopOrder.length]
+  player.loopMode = nextLoopMode(playerState.loopMode)
 }
 
 const fmt = formatClock
@@ -29,7 +28,10 @@ const fmt = formatClock
 
 <template>
   <div class="player-bar">
-    <div class="title" :title="title">{{ title }}</div>
+    <button class="player-meta" title="打开正在播放" @click="emit('openNowPlaying')">
+      <span class="title">{{ title }}</span>
+      <span v-if="currentLyric" class="title-lyric">{{ currentLyric }}</span>
+    </button>
     <button class="ghost" @click="player.toggle()">
       {{ playerState.playing ? '暂停' : '播放' }}
     </button>
@@ -37,7 +39,7 @@ const fmt = formatClock
     <label class="rate">
       倍速
       <select :value="playerState.rate" @change="setRate">
-        <option v-for="r in rateOptions" :key="r" :value="r">{{ formatRateLabel(r) }}</option>
+        <option v-for="r in RATE_OPTIONS" :key="r" :value="r">{{ formatRateLabel(r) }}</option>
       </select>
     </label>
     <span v-if="playerState.preparing" class="prep">
@@ -47,5 +49,6 @@ const fmt = formatClock
       {{ playerState.error }}
     </span>
     <div class="time">{{ fmt(playerState.currentTime) }} / {{ fmt(playerState.duration) }}</div>
+    <button class="ghost lyric-toggle" @click="emit('openNowPlaying')">歌词</button>
   </div>
 </template>

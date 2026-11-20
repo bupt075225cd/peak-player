@@ -45,6 +45,7 @@ test('安全面：只暴露白名单 api，渲染进程没有 Node 能力', asyn
 
     expect(surface.keys).toEqual([
       'addUsage',
+      'getLyrics',
       'getRanking',
       'getWeeklyUsage',
       'importFiles',

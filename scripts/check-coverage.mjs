@@ -74,7 +74,7 @@ for (const [name, floor] of Object.entries(modules)) {
 }
 
 const pad = (text, width) => String(text).padEnd(width)
-console.log('\n覆盖率基线校验（阈值与调整原因见 scripts/coverage-baseline.json）')
+console.log('\n覆盖率基线校验（阈值定义见 scripts/coverage-baseline.json）')
 console.log(`${pad('模块', 28)}${pad('语句', 10)}${pad('分支', 10)}${pad('函数', 10)}${pad('行', 10)}判定`)
 for (const { name, pct, floor, ok } of rows) {
   const cell = (metric) => pad(`${pct[metric]}`, 10)
@@ -88,7 +88,7 @@ for (const { name, pct, floor, ok } of rows) {
 if (failures.length > 0) {
   console.error('\n!! 覆盖率低于基线，已阻止本次操作：')
   for (const line of failures) console.error(`   - ${line}`)
-  console.error('\n   补充测试，或在确有理由时更新 scripts/coverage-baseline.json 并在提交信息里说明。')
+  console.error('\n   请补充测试覆盖。不得以下调基线、调整阈值或缩小统计范围的方式让检查通过。')
   process.exit(1)
 }
 

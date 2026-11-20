@@ -1,7 +1,14 @@
 import { dialog, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import type { DailyUsage, RankingBy, Track, VariantProgress, VariantResult } from '../shared/types'
+import type {
+  DailyUsage,
+  LyricDoc,
+  RankingBy,
+  Track,
+  VariantProgress,
+  VariantResult
+} from '../shared/types'
 import { isSupportedAudio } from './audio-exts'
 import {
   addTrackSeconds,
@@ -15,6 +22,7 @@ import {
   setTrackDuration,
   updateTrack
 } from './db'
+import { loadLyrics } from './lyrics'
 import { prepareVariant, probeAudioDuration } from './transcode'
 import { ensureTrackDuration } from './track-duration'
 import { getMainWindow } from './window'
@@ -41,6 +49,8 @@ export interface IpcDeps {
     rate: number,
     onProgress: (ratio: number) => void
   ) => Promise<VariantResult>
+  // 读取歌曲同目录同名 .lrc；没有歌词时返回 source: 'none'
+  loadLyrics: (trackPath: string) => Promise<LyricDoc>
   newId: () => string
 }
 
@@ -104,6 +114,10 @@ export function createIpcHandlers(deps: IpcDeps): IpcHandlers {
 
     'stats:ranking': (_e: IpcEvent, by: RankingBy): Track[] => deps.getRanking(by),
 
+    // 歌词：只读歌曲同目录同名 .lrc，缺失时返回 source: 'none'
+    'lyrics:get': (_e: IpcEvent, trackPath: string): Promise<LyricDoc> =>
+      deps.loadLyrics(trackPath),
+
     // 变速预渲染：失败时返回 { error } 让渲染进程退回内置伸缩
     'audio:variant': (e: IpcEvent, trackPath: string, rate: number): Promise<VariantResult> => {
       const sender = e.sender
@@ -145,6 +159,7 @@ export function createIpcDeps(): IpcDeps {
     ensureTrackDuration: (id) =>
       ensureTrackDuration(id, { getTrack, probeAudioDuration, setTrackDuration }),
     prepareVariant,
+    loadLyrics,
     newId: () => randomUUID()
   }
 }

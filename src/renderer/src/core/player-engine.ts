@@ -242,6 +242,12 @@ export class PlayerEngine {
     this.state.currentTime = target
   }
 
+  // 歌词面板用 rAF 采样精确进度：timeupdate 只有约 4Hz，
+  // 直接拿 state.currentTime 做行内扫光会一跳一跳
+  displayTime(): number {
+    return toDisplayTime(this.audio.currentTime, this.srcRate)
+  }
+
   async load(track: Track, srcTime = 0): Promise<void> {
     this.state.current = track
     this.state.currentTime = srcTime

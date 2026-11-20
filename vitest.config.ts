@@ -1,6 +1,9 @@
+import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  // 组件级测试直接渲染 .vue：用 SSR 输出验证结构，不需要引入 DOM 模拟器
+  plugins: [vue()],
   test: {
     environment: 'node',
     // src 下是单测，test/integration 是跨模块集成测试

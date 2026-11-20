@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import { ffmpegEnv } from './helpers/ffmpeg-env'
 import {
@@ -85,6 +86,79 @@ test('ffmpeg 不可用时降级为内置伸缩：不报错、继续播放', asyn
     await selectRate(ctx.page, '1.25')
     await expect(playPauseButton(ctx.page)).toHaveText('暂停')
     await expect(playerBar(ctx.page).locator('.error')).toHaveCount(0)
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('歌词：同名 .lrc 在播放条与全屏页展示，Esc 收起', async () => {
+  const ctx = await launchApp({ audio: [{ name: 'tone.wav', seconds: 30 }] })
+  try {
+    // 歌词与音频同目录同名；第二句放到 20s 之后，避免断言期间串行
+    writeFileSync(
+      ctx.pathOf('tone.lrc'),
+      '[ti:测试]\n[00:00.50]第一句\n[00:20.00]第二句\n',
+      'utf8'
+    )
+
+    await importFiles(ctx.app, ctx.page, [ctx.pathOf('tone.wav')])
+    await playRow(ctx.page).click()
+
+    await expect(playerBar(ctx.page).locator('.title-lyric')).toContainText('第一句')
+
+    await ctx.page.getByRole('button', { name: '歌词', exact: true }).click()
+    const overlay = ctx.page.locator('.now-playing')
+    await expect(overlay).toBeVisible()
+    await expect(overlay.locator('.lyric-line')).toHaveCount(2)
+    await expect(overlay.locator('.lyric-line.active')).toContainText('第一句')
+
+    // 点击歌词行跳转，仍保持在歌词页
+    await overlay.locator('.lyric-line').nth(1).click()
+    await expect(overlay).toBeVisible()
+
+    await ctx.page.keyboard.press('Escape')
+    await expect(overlay).toHaveCount(0)
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('歌词页：手动滚动暂停跟随，拖动进度条联动高亮', async () => {
+  const ctx = await launchApp({ audio: [{ name: 'tone.wav', seconds: 60 }] })
+  try {
+    writeFileSync(
+      ctx.pathOf('tone.lrc'),
+      '[00:00.50]第一句\n[00:05.00]第二句\n[00:30.00]第三句\n',
+      'utf8'
+    )
+
+    await importFiles(ctx.app, ctx.page, [ctx.pathOf('tone.wav')])
+    await playRow(ctx.page).click()
+    await ctx.page.getByRole('button', { name: '歌词', exact: true }).click()
+
+    const overlay = ctx.page.locator('.now-playing')
+    const viewport = overlay.locator('.lyrics-viewport')
+    const back = overlay.getByRole('button', { name: '回到当前歌词' })
+    await expect(viewport).toBeVisible()
+
+    // 手动滚动后暂停自动跟随（4 秒内恢复），出现「回到当前歌词」
+    await viewport.hover()
+    await ctx.page.mouse.wheel(0, 400)
+    await expect(back).toBeVisible()
+
+    await back.click()
+    await expect(back).toHaveCount(0)
+
+    // 拖动进度条到 30s：当前高亮切到第三句
+    await overlay.locator('.np-range').evaluate((el) => {
+      const input = el as HTMLInputElement
+      input.value = '30'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+    await expect.poll(() => currentSeconds(ctx.page)).toBeGreaterThanOrEqual(25)
+    await expect(overlay.locator('.lyric-line.active')).toContainText('第三句')
   } finally {
     await ctx.close()
   }

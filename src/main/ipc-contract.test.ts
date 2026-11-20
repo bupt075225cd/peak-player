@@ -45,6 +45,7 @@ function stubDeps(): IpcDeps {
     getRanking: () => [],
     ensureTrackDuration: async () => 0,
     prepareVariant: async () => ({ path: '/cache/a.flac' }),
+    loadLyrics: async () => ({ lines: [], offset: 0, source: 'none' }),
     newId: () => 'id'
   }
 }

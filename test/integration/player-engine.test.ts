@@ -205,6 +205,16 @@ describe('PlayerEngine', () => {
       expect(audio.currentTime).toBe(0)
       expect(state.currentTime).toBe(0)
     })
+
+    it('displayTime 始终返回原速时间（歌词 rAF 采样用）', async () => {
+      await engine.play(makeTrack())
+      audio.currentTime = 12
+      expect(engine.displayTime()).toBe(12)
+
+      await engine.setRate(1.25)
+      audio.currentTime = 12
+      expect(engine.displayTime()).toBe(15)
+    })
   })
 
   describe('时长同步', () => {
