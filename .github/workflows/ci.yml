@@ -41,6 +41,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 单测里的 transcode.test.ts 与时长探测需要真实 ffmpeg（含 rubberband）。
+      # 放在单测之前，测试与打包才用同一份二进制，覆盖率也不会因平台不同而漂移。
+      # 上一步的缓存命中时这里只做存在性与可用性校验，不重新下载。
+      - name: Fetch ffmpeg for tests
+        run: node scripts/fetch-ffmpeg.mjs
+
       # 与 .husky/pre-push 一致：静态检查 → 覆盖率与基线 → 编译；
       # Windows 安装包只在 CI 里打
       - name: Static check (tsc + vue-tsc)

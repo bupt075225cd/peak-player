@@ -62,6 +62,11 @@ peak-player/
 # 安装依赖（会编译 better-sqlite3，首次较慢）
 npm install
 
+# 下载随包 ffmpeg（约 80MB）
+# 变速预渲染、以及 transcode / 时长探测相关的单测都依赖它；
+# 缺了这步单测会跳过那组用例，覆盖率随之下降并卡住 pre-commit
+npm run fetch:ffmpeg
+
 # 启动开发模式
 npm run dev
 ```
@@ -169,6 +174,10 @@ npm run check:coverage
 | `src/renderer/src/core/` | 93.71 | 90.97 | 92.29 | 93.71 | 95.71 / 92.97 / 94.29 / 95.71 |
 | `src/renderer/src/stores/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
 | `src/renderer/src/utils/` | 98 | 98 | 98 | 98 | 100 / 100 / 100 / 100 |
+
+> `transcode.test.ts` 与时长探测需要带 rubberband 的 ffmpeg，否则整组跳过、`src/main/`
+> 会掉约 6 个百分点。CI 因此在单测之前就执行 `node scripts/fetch-ffmpeg.mjs`
+> （缓存命中时只做可用性校验），保证本机与 CI 用的是同一份二进制、覆盖率口径一致。
 
 `pre-commit`、`pre-push` 与 CI（`.github/workflows/ci.yml`）都执行
 `npm run test:coverage` + `npm run check:coverage`，任一模块的任一指标低于基线时，
