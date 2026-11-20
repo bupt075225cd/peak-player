@@ -11,6 +11,9 @@ files:
 asarUnpack:
   - node_modules/better-sqlite3/**
 npmRebuild: true
+# 安装包只通过 CI artifact 分发。CI 环境下 electron-builder 默认会尝试
+# 发布到 GitHub Release，缺 GH_TOKEN 时直接让打包失败（exit code 1）。
+publish: null
 # ffmpeg 需以真实文件形式落盘（asar 内的二进制无法 spawn）
 extraResources:
   - from: resources/bin
