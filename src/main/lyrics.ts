@@ -2,19 +2,26 @@
 // 读盘与解析拆开：解析在 shared/lyrics.ts（纯函数），这里只负责路径探测、
 // 编码兜底与缓存。文件缺失、超限、损坏都降级为「无歌词」，绝不向渲染进程抛错。
 import { readFile, stat } from 'node:fs/promises'
-import { basename, dirname, extname, join } from 'node:path'
+import * as nodePath from 'node:path'
 import { emptyLyrics, parseLrc } from '../shared/lyrics'
 import type { LyricDoc } from '../shared/types'
 
 // 超过这个体积基本可以断定不是歌词（误放了日志之类），直接忽略
 export const MAX_LYRIC_BYTES = 512 * 1024
 
-export function candidateLyricPaths(audioPath: string): string[] {
+// 只用到 path 的这几个方法；显式传入 path.posix / path.win32 可在任意平台
+// 验证另一种分隔符逻辑，避免只在 CI 的 Windows 机器上才暴露路径问题
+export type PathApi = Pick<
+  typeof nodePath,
+  'basename' | 'dirname' | 'extname' | 'join'
+>
+
+export function candidateLyricPaths(audioPath: string, path: PathApi = nodePath): string[] {
   if (!audioPath) return []
-  const dir = dirname(audioPath)
-  const stem = basename(audioPath, extname(audioPath))
+  const dir = path.dirname(audioPath)
+  const stem = path.basename(audioPath, path.extname(audioPath))
   // Linux 区分大小写，两种常见写法都探测一次
-  return [join(dir, `${stem}.lrc`), join(dir, `${stem}.LRC`)]
+  return [path.join(dir, `${stem}.lrc`), path.join(dir, `${stem}.LRC`)]
 }
 
 function hasPrefix(buf: Uint8Array, bytes: number[]): boolean {
