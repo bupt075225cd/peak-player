@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-11-19",
+  "source": "npm run test:coverage（18 files / 182 tests）",
+  "rule": "以 2026-11-19 的实测覆盖率为准，各模块下浮 5 个百分点；低于基线时 pre-commit 与 pre-push 拦截",
+  "modules": {
+    "all": {
+      "statements": 35.99,
+      "branches": 85.75,
+      "functions": 79.78,
+      "lines": 35.99
+    },
+    "src/main/": {
+      "statements": 49.41,
+      "branches": 84.14,
+      "functions": 84.09,
+      "lines": 49.41
+    },
+    "src/shared/": {
+      "statements": 95,
+      "branches": 95,
+      "functions": 95,
+      "lines": 95
+    },
+    "src/renderer/src/core/": {
+      "statements": 17.31,
+      "branches": 92.91,
+      "functions": 86.66,
+      "lines": 17.31
+    },
+    "src/renderer/src/stores/": {
+      "statements": 95,
+      "branches": 95,
+      "functions": 95,
+      "lines": 95
+    },
+    "src/renderer/src/utils/": {
+      "statements": 95,
+      "branches": 95,
+      "functions": 95,
+      "lines": 95
+    }
+  }
+}

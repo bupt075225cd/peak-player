@@ -121,6 +121,9 @@ npm run test:watch
 
 # 覆盖率报告（coverage/）
 npm run test:coverage
+
+# 只校验基线（需先有 coverage/coverage-summary.json）
+npm run check:coverage
 ```
 
 > 说明：better-sqlite3 以 electron ABI 编译，测试通过 `scripts/run-tests.mjs`
@@ -128,6 +131,29 @@ npm run test:coverage
 >
 > 本机 glibc < 2.29 时该原生模块加载不了，`db.test.ts` 会整片标红（并非代码问题），
 > 处理方式见下方常见问题「GLIBC_2.29 not found」。
+
+### 覆盖率基线
+
+`scripts/coverage-baseline.json` 记录各模块的下限，取值是 2026-11-19 的实测覆盖率
+下浮 5 个百分点（覆盖率为 0 的模块不设基线）：
+
+| 模块 | 语句 | 分支 | 函数 | 行 |
+|---|---|---|---|---|
+| all | 35.99 | 85.75 | 79.78 | 35.99 |
+| `src/main/` | 49.41 | 84.14 | 84.09 | 49.41 |
+| `src/shared/` | 95 | 95 | 95 | 95 |
+| `src/renderer/src/core/` | 17.31 | 92.91 | 86.66 | 17.31 |
+| `src/renderer/src/stores/` | 95 | 95 | 95 | 95 |
+| `src/renderer/src/utils/` | 95 | 95 | 95 | 95 |
+
+`pre-commit` 与 `pre-push` 都执行 `npm run test:coverage && npm run check:coverage`，
+任一模块的任一指标低于基线，提交/推送会被中断。
+
+需要更新基线时：先跑 `npm run test:coverage` 并查看 `coverage/index.html`，确认变化是有意的，
+再改 `scripts/coverage-baseline.json` 并在提交信息里写明原因。
+
+> 注意：整体语句覆盖率被 `.vue` 与入口文件（均为 0%）拉低到 41% 左右，
+> 判断改动是否退化应看模块级数字，不要只盯 `all`。
 
 ## 架构说明
 
