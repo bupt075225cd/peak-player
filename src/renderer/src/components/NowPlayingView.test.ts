@@ -4,7 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, h, nextTick, ref } from 'vue'
 import { createPinia } from 'pinia'
-import { player, playerState } from '../core/player'
+import { nextTrack, player, playerState, prevTrack } from '../core/player'
+import { useLibraryStore } from '../stores/library'
 import NowPlayingView from './NowPlayingView.vue'
 
 vi.mock('../core/player', async () => {
@@ -33,12 +34,16 @@ vi.mock('../core/player', async () => {
       set loopMode(value: 'none' | 'single' | 'all') {
         state.loopMode = value
       }
-    }
+    },
+    nextTrack: vi.fn(),
+    prevTrack: vi.fn()
   }
 })
 
 const seek = vi.mocked(player.seek)
 const setRate = vi.mocked(player.setRate)
+const next = vi.mocked(nextTrack)
+const prev = vi.mocked(prevTrack)
 
 let mounted: { app: ReturnType<typeof createApp>; host: HTMLElement } | null
 let onClose: ReturnType<typeof vi.fn>
@@ -47,13 +52,14 @@ function mount(open: boolean) {
   const host = document.createElement('div')
   document.body.appendChild(host)
   const openRef = ref(open)
+  const pinia = createPinia()
   const app = createApp({
     render: () => h(NowPlayingView, { open: openRef.value, onClose })
   })
-  app.use(createPinia())
+  app.use(pinia)
   app.mount(host)
   mounted = { app, host }
-  return { ...mounted, openRef }
+  return { ...mounted, openRef, pinia }
 }
 
 beforeEach(() => {
@@ -75,6 +81,8 @@ beforeEach(() => {
   }
   seek.mockClear()
   setRate.mockClear()
+  next.mockClear()
+  prev.mockClear()
   onClose = vi.fn()
 
   vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1))
@@ -116,6 +124,41 @@ describe('NowPlayingView', () => {
     expect(text).toContain('0:42')
     expect(text).toContain('3:20')
     expect(text).toContain('暂无歌词')
+  })
+
+  // 空列表时没有可切的目标，按钮应禁用；有曲目后点击才真正切歌
+  it('上/下一曲按钮：空库禁用，有曲目时触发切换', async () => {
+    const { host, pinia } = mount(true)
+    await nextTick()
+
+    const buttons = (): HTMLButtonElement[] => [
+      ...host.querySelectorAll<HTMLButtonElement>('.np-controls button')
+    ]
+    const buttonOf = (label: string): HTMLButtonElement =>
+      buttons().find((b) => b.textContent?.trim() === label)!
+
+    expect(buttonOf('上一曲').disabled).toBe(true)
+    expect(buttonOf('下一曲').disabled).toBe(true)
+
+    const library = useLibraryStore(pinia)
+    library.tracks = [
+      {
+        id: '1',
+        title: 'A',
+        path: '/a.mp3',
+        sourceType: 'local',
+        playCount: 0,
+        totalSeconds: 0,
+        duration: 10
+      }
+    ]
+    await nextTick()
+
+    buttonOf('上一曲').click()
+    buttonOf('下一曲').click()
+
+    expect(prev).toHaveBeenCalledTimes(1)
+    expect(next).toHaveBeenCalledTimes(1)
   })
 
   it('没有当前曲目时标题显示未在播放', async () => {

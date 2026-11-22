@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { player, playerState } from '../core/player'
+import { nextTrack, player, playerState, prevTrack } from '../core/player'
 import { LOOP_LABELS, RATE_OPTIONS, nextLoopMode } from '../core/playback'
+import { useLibraryStore } from '../stores/library'
 import { useLyricsStore } from '../stores/lyrics'
 import { formatClock, formatRateLabel, progressPercent } from '../utils/format'
 import { currentLyricText } from '../utils/lyrics'
@@ -9,9 +10,12 @@ import { currentLyricText } from '../utils/lyrics'
 const emit = defineEmits<{ openNowPlaying: [] }>()
 
 const lyrics = useLyricsStore()
+const library = useLibraryStore()
 
 const title = computed(() => playerState.current?.title ?? '未在播放')
 const loopLabel = computed(() => LOOP_LABELS[playerState.loopMode])
+// 空列表时没有可切的目标，按钮直接禁用，避免点了没反应
+const canSwitch = computed(() => library.tracks.length > 0)
 // 播放条只需要 4Hz 的 currentTime，全屏歌词页才用 rAF 取精确进度
 const currentLyric = computed(() => currentLyricText(lyrics.lines, playerState.currentTime))
 
@@ -32,8 +36,14 @@ const fmt = formatClock
       <span class="title">{{ title }}</span>
       <span v-if="currentLyric" class="title-lyric">{{ currentLyric }}</span>
     </button>
+    <button class="ghost" :disabled="!canSwitch" title="上一曲" @click="prevTrack()">
+      上一曲
+    </button>
     <button class="ghost" @click="player.toggle()">
       {{ playerState.playing ? '暂停' : '播放' }}
+    </button>
+    <button class="ghost" :disabled="!canSwitch" title="下一曲" @click="nextTrack()">
+      下一曲
     </button>
     <button class="ghost" @click="cycleLoop()">{{ loopLabel }}</button>
     <label class="rate">

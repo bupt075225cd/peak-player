@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import type { LoopMode } from '../../../shared/types'
 import { useLibraryStore } from '../stores/library'
+import { neighborTrack } from '../utils/queue'
 import { RATE_MAX, RATE_MIN } from './playback'
 import {
   createInitialPlayerState,
@@ -22,3 +23,13 @@ export const player = new PlayerEngine({
   state: playerState,
   syncPlayCount: (id, count) => useLibraryStore().syncPlayCount(id, count)
 })
+
+// 上/下一首：按播放列表顺序切换，首尾相接；未在播放时从头/尾开始。
+// 队列顺序由 library store 决定，引擎只负责加载与播放。
+function playNeighbor(dir: 1 | -1): Promise<void> {
+  const target = neighborTrack(useLibraryStore().tracks, playerState.current?.id, dir)
+  return target === null ? Promise.resolve() : player.play(target)
+}
+
+export const nextTrack = (): Promise<void> => playNeighbor(1)
+export const prevTrack = (): Promise<void> => playNeighbor(-1)

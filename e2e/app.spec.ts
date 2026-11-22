@@ -112,6 +112,29 @@ test('播放：加载出真实时长并推进播放进度', async () => {
   }
 })
 
+test('播放条：上一曲 / 下一曲按列表顺序切换', async () => {
+  const ctx = await launchApp()
+  try {
+    await importFiles(ctx.app, ctx.page, [ctx.pathOf('tone.wav'), ctx.pathOf('short.wav')])
+    await expect(rows(ctx.page)).toHaveCount(2)
+
+    // 列表顺序由 db 决定（按标题排序），这里直接取表格里的实际顺序
+    const first = ((await rows(ctx.page).nth(0).locator('td').nth(0).textContent()) ?? '').trim()
+    const second = ((await rows(ctx.page).nth(1).locator('td').nth(0).textContent()) ?? '').trim()
+
+    await playRow(ctx.page, 0).click()
+    await expect(playerBar(ctx.page).locator('.title')).toHaveText(first)
+
+    await playerBar(ctx.page).getByRole('button', { name: '下一曲' }).click()
+    await expect(playerBar(ctx.page).locator('.title')).toHaveText(second)
+
+    await playerBar(ctx.page).getByRole('button', { name: '上一曲' }).click()
+    await expect(playerBar(ctx.page).locator('.title')).toHaveText(first)
+  } finally {
+    await ctx.close()
+  }
+})
+
 test('关闭窗口后进程驻留，音频继续播放', async () => {
   // 用足够长的素材：3 秒的曲子会在断言期间播完并因单曲循环回到 0:00
   const ctx = await launchApp({ audio: [{ name: 'tone.wav', seconds: 30 }] })

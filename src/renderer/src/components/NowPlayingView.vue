@@ -2,8 +2,9 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import LyricsPanel from './LyricsPanel.vue'
 import { useSeekDrag } from '../composables/useSeekDrag'
-import { player, playerState } from '../core/player'
+import { nextTrack, player, playerState, prevTrack } from '../core/player'
 import { LOOP_LABELS, RATE_OPTIONS, nextLoopMode } from '../core/playback'
+import { useLibraryStore } from '../stores/library'
 import { useLyricsStore } from '../stores/lyrics'
 import { formatClock, formatRateLabel, progressPercent } from '../utils/format'
 
@@ -11,6 +12,10 @@ const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const lyrics = useLyricsStore()
+const library = useLibraryStore()
+
+// 空列表时没有可切的目标，按钮直接禁用
+const canSwitch = computed(() => library.tracks.length > 0)
 
 // 拖动状态与「松手才 seek」的逻辑在 composable 里，单测覆盖
 const drag = useSeekDrag({
@@ -92,8 +97,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </div>
 
         <div class="np-controls">
+          <button class="ghost" :disabled="!canSwitch" title="上一曲" @click="prevTrack()">
+            上一曲
+          </button>
           <button class="np-play" :disabled="playerState.preparing" @click="player.toggle()">
             {{ playerState.playing ? '暂停' : '播放' }}
+          </button>
+          <button class="ghost" :disabled="!canSwitch" title="下一曲" @click="nextTrack()">
+            下一曲
           </button>
           <button class="ghost" @click="cycleLoop()">{{ LOOP_LABELS[playerState.loopMode] }}</button>
           <label class="np-rate">
