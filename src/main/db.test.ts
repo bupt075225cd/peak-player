@@ -8,6 +8,7 @@ import {
   addTracks,
   addTrackSeconds,
   addUsage,
+  deleteTrack,
   getRanking,
   getTrack,
   getWeeklyUsage,
@@ -83,6 +84,33 @@ describe('addTracks / listTracks', () => {
       makeTrack({ id: '2', title: 'song', path: '/b/song.mp3' })
     ])
     expect(listTracks()).toHaveLength(2)
+  })
+})
+
+describe('deleteTrack', () => {
+  it('只删除目标记录，其他曲目不受影响', () => {
+    addTracks([makeTrack({ id: '1', title: 'A' }), makeTrack({ id: '2', title: 'B' })])
+
+    deleteTrack('1')
+
+    expect(listTracks().map((t) => t.id)).toEqual(['2'])
+    expect(getTrack('1')).toBeUndefined()
+  })
+
+  it('删除不存在的 id 不报错', () => {
+    addTracks([makeTrack({ id: '1' })])
+
+    expect(() => deleteTrack('missing')).not.toThrow()
+    expect(listTracks()).toHaveLength(1)
+  })
+
+  it('只删库记录，历史用时统计保留', () => {
+    addTracks([makeTrack({ id: '1' })])
+    addUsage(30)
+
+    deleteTrack('1')
+
+    expect(getWeeklyUsage(7)[6].seconds).toBe(30)
   })
 })
 

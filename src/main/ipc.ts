@@ -14,6 +14,7 @@ import {
   addTrackSeconds,
   addTracks,
   addUsage,
+  deleteTrack,
   getRanking,
   getTrack,
   getWeeklyUsage,
@@ -37,6 +38,8 @@ export interface IpcDeps {
   listTracks: () => Track[]
   addTracks: (tracks: Track[]) => number
   getTrack: (id: string) => Track | undefined
+  // 只删库记录，不动磁盘文件
+  deleteTrack: (id: string) => void
   updateTrack: (id: string, patch: Partial<Pick<Track, 'playCount'>>) => void
   incrementCount: (id: string, delta: number) => number
   setTrackDuration: (id: string, seconds: number) => void
@@ -88,6 +91,9 @@ export function createIpcHandlers(deps: IpcDeps): IpcHandlers {
     },
 
     'tracks:list': (): Track[] => deps.listTracks(),
+
+    // 只删库记录，磁盘上的音频与歌词文件保留
+    'tracks:delete': (_e: IpcEvent, id: string): void => deps.deleteTrack(id),
 
     // 改次数会按「曲目真实时长 × 次数差」换算用时统计；
     // 从未播放过（或升级前入库）的曲目 duration 为 0，先补采一次再换算
@@ -147,6 +153,7 @@ export function createIpcDeps(): IpcDeps {
     listTracks,
     addTracks,
     getTrack,
+    deleteTrack,
     updateTrack,
     incrementCount,
     setTrackDuration,

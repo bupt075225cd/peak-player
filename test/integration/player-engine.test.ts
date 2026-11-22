@@ -359,6 +359,41 @@ describe('PlayerEngine', () => {
     })
   })
 
+  // 删除正在播放的曲目时会调用 stop()，必须把播放条/歌词指向的状态一起清干净
+  describe('删除曲目后停止', () => {
+    it('清空当前曲目与播放状态，并结算最后一段用时', async () => {
+      vi.useFakeTimers()
+      build({ intervalMs: 10000 })
+      await engine.play(makeTrack())
+
+      vi.advanceTimersByTime(3000)
+      engine.stop()
+
+      expect(api.calls.addUsage).toEqual([[3, 't1']])
+      expect(state.current).toBeNull()
+      expect(state.playing).toBe(false)
+      expect(state.currentTime).toBe(0)
+      expect(state.duration).toBe(0)
+      expect(state.error).toBe('')
+      expect(audio.src).toBe('')
+      expect(audio.playbackRate).toBe(1)
+
+      // 计时已停止，不会继续累计
+      vi.advanceTimersByTime(30000)
+      expect(api.calls.addUsage).toHaveLength(1)
+    })
+
+    it('清空 src 触发的 error 事件不显示为播放失败', async () => {
+      await engine.play(makeTrack())
+      engine.stop()
+
+      audio.error = { code: 4, message: 'MEDIA_ELEMENT_ERROR' }
+      audio.emit('error')
+
+      expect(state.error).toBe('')
+    })
+  })
+
   describe('可注入依赖', () => {
     it('支持自定义 URL 解析、计时器，且同步回调可缺省', async () => {
       const timers = {

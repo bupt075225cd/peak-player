@@ -155,7 +155,8 @@ export class PlayerEngine {
     // 资源加载失败（文件被移动/删除、协议取不到数据）不会抛到界面上，这里兜住
     this.audio.addEventListener('error', () => {
       const err = this.audio.error
-      if (!err) return
+      // stop() 会清空当前曲目，此时 src 置空可能触发一次 error，不应显示成播放失败
+      if (!err || !this.state.current) return
       this.state.error = formatMediaError(err.code, err.message)
       // play() 会先触发 play 事件再报错，这里纠正状态，避免显示「暂停」却没声音
       this.stopTimer()
@@ -232,6 +233,26 @@ export class PlayerEngine {
 
   pause(): void {
     this.audio.pause()
+  }
+
+  // 从库中删除正在播放的曲目时调用：清空当前曲目并停止播放。
+  // 否则播放条、歌词面板会继续指向一条已经不存在的记录。
+  stop(): void {
+    this.audio.pause()
+    this.stopTimer()
+    // 丢弃仍在进行的变速请求，避免其结果回来后重新写入状态
+    this.rateToken++
+    this.srcRate = 1
+    this.state.current = null
+    this.state.playing = false
+    this.state.currentTime = 0
+    this.state.duration = 0
+    this.state.preparing = false
+    this.state.progress = 0
+    this.state.fallback = false
+    this.state.error = ''
+    this.audio.src = ''
+    this.audio.playbackRate = 1
   }
 
   // seconds 为原速时间轴上的位置
@@ -321,7 +342,7 @@ export class PlayerEngine {
     const cur = this.state.current
     if (cur) {
       const id = cur.id
-      // 以主进程返回的最新次数为准，同时同步音乐库列表，避免界面停留在旧值
+      // 以主进程返回的最新次数为准，同时同步播放列表，避免界面停留在旧值
       void this.api.incrementCount(id, 1).then((count) => {
         if (this.state.current?.id === id) this.state.current.playCount = count
         this.deps.syncPlayCount?.(id, count)

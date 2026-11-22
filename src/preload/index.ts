@@ -11,6 +11,8 @@ import type {
 const api = {
   importFiles: (): Promise<Track[]> => ipcRenderer.invoke('tracks:import'),
   listTracks: (): Promise<Track[]> => ipcRenderer.invoke('tracks:list'),
+  // 只移除库记录，磁盘文件保留
+  deleteTrack: (id: string): Promise<void> => ipcRenderer.invoke('tracks:delete', id),
   updateTrack: (id: string, patch: Partial<Pick<Track, 'playCount'>>): Promise<void> =>
     ipcRenderer.invoke('tracks:update', id, patch),
   incrementCount: (id: string, delta: number): Promise<number> =>

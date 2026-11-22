@@ -91,6 +91,12 @@ export function getTrack(id: string): Track | undefined {
     .get(id) as Track | undefined
 }
 
+// 仅删除库记录：磁盘上的音频、歌词与字幕文件一律不动，
+// 需要恢复时重新导入即可（按 path 去重，重新导入会生成新的 id 与全新统计）
+export function deleteTrack(id: string): void {
+  getDb().prepare('DELETE FROM tracks WHERE id = ?').run(id)
+}
+
 export function updateTrack(id: string, patch: Partial<Pick<Track, 'playCount'>>): void {
   if (patch.playCount === undefined) return
   setPlayCount(id, patch.playCount)

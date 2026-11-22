@@ -31,6 +31,9 @@ function setupApi(overrides: Record<string, unknown> = {}) {
     updateTrack: vi.fn(async () => {
       calls.push('updateTrack')
     }),
+    deleteTrack: vi.fn(async () => {
+      calls.push('deleteTrack')
+    }),
     getWeeklyUsage: vi.fn(async (): Promise<DailyUsage[]> => {
       calls.push('getWeeklyUsage')
       return []
@@ -105,6 +108,18 @@ describe('library store', () => {
 
     expect(weekly).toHaveBeenCalledTimes(1)
     expect(ranking).toHaveBeenCalledTimes(1)
+  })
+
+  // 删除只作用于库记录：先写库，再本地摘行，最后刷新排行榜（排行榜 JOIN tracks，已删曲目会消失）
+  it('remove 先删库、再刷新排行榜，并从本地列表摘掉该行', async () => {
+    const library = useLibraryStore()
+    library.tracks = [makeTrack({ id: '1' }), makeTrack({ id: '2', title: 'other' })]
+
+    await library.remove('1')
+
+    expect(ctx.api.deleteTrack).toHaveBeenCalledWith('1')
+    expect(library.tracks.map((t) => t.id)).toEqual(['2'])
+    expect(ctx.calls).toEqual(['deleteTrack', 'getRanking'])
   })
 
   it('syncPlayCount 只改目标行，且保持对象引用不变', async () => {

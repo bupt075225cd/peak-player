@@ -10,6 +10,7 @@ import type {
 export interface PeakPlayerApi {
   importFiles(): Promise<Track[]>
   listTracks(): Promise<Track[]>
+  deleteTrack(id: string): Promise<void>
   updateTrack(id: string, patch: Partial<Pick<Track, 'playCount'>>): Promise<void>
   incrementCount(id: string, delta: number): Promise<number>
   setTrackDuration(id: string, seconds: number): Promise<void>

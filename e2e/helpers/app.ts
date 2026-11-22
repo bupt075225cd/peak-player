@@ -140,6 +140,6 @@ export async function selectRate(page: Page, rate: string): Promise<void> {
   await playerBar(page).locator('select').selectOption(rate)
 }
 
-export async function switchView(page: Page, name: '音乐库' | '排行榜' | '用时统计'): Promise<void> {
+export async function switchView(page: Page, name: '播放列表' | '排行榜' | '用时统计'): Promise<void> {
   await page.locator('.sidebar').getByRole('button', { name }).click()
 }

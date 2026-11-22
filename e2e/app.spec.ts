@@ -25,7 +25,7 @@ test('冷启动：空库提示与窗口标题', async () => {
   const ctx = await launchApp()
   try {
     await expect(ctx.page).toHaveTitle('Peak Player')
-    await expect(ctx.page.getByRole('heading', { name: '音乐库' })).toBeVisible()
+    await expect(ctx.page.getByRole('heading', { name: '播放列表' })).toBeVisible()
     await expect(ctx.page.locator('.empty')).toContainText('暂无歌曲')
     await expect(ctx.page.locator('.player-bar .title')).toHaveText('未在播放')
   } finally {

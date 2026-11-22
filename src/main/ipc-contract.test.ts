@@ -37,6 +37,7 @@ function stubDeps(): IpcDeps {
     listTracks: () => [],
     addTracks: () => 0,
     getTrack: () => undefined,
+    deleteTrack: () => {},
     updateTrack: () => {},
     incrementCount: () => 0,
     setTrackDuration: () => {},

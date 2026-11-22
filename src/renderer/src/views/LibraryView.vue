@@ -40,12 +40,18 @@ async function commitEdit(track: Track): Promise<void> {
   if (next === null) return
   await library.setPlayCount(track.id, next)
 }
+
+// 只从播放列表移除记录，音频/歌词/字幕文件都保留在磁盘上
+async function remove(track: Track): Promise<void> {
+  await library.remove(track.id)
+  if (playerState.current?.id === track.id) player.stop()
+}
 </script>
 
 <template>
   <div class="view">
     <div class="toolbar">
-      <h2>音乐库</h2>
+      <h2>播放列表</h2>
       <button :disabled="library.loading" @click="library.importFiles()">
         {{ library.loading ? '导入中…' : '导入音频文件' }}
       </button>
@@ -83,6 +89,7 @@ async function commitEdit(track: Track): Promise<void> {
           <td>
             <button class="small" @click="play(t)">播放</button>
             <button class="small ghost" @click="editCount(t)">改次数</button>
+            <button class="small ghost" @click="remove(t)">删除</button>
           </td>
         </tr>
       </tbody>
