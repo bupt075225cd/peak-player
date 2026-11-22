@@ -127,7 +127,7 @@ export function createIpcHandlers(deps: IpcDeps): IpcHandlers {
       return deps.listAlbums()
     },
 
-    // 删专辑只解除归属，曲目保留
+    // 删播放列表只解除归属，曲目保留
     'albums:delete': (_e: IpcEvent, id: string): Album[] => {
       deps.deleteAlbum(id)
       return deps.listAlbums()

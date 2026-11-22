@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Album, Track } from '../../../shared/types'
 import { useStatsStore } from './stats'
 
-// 专辑筛选的三个特殊值：全部、未分类、或某个专辑 id
+// 播放列表筛选的三个特殊值：全部歌曲、未分类、或某个播放列表 id
 export const FILTER_ALL = 'all'
 export const FILTER_NONE = 'none'
 
@@ -11,12 +11,12 @@ export const useLibraryStore = defineStore('library', () => {
   const tracks = ref<Track[]>([])
   const albums = ref<Album[]>([])
   const loading = ref(false)
-  // 当前筛选项，决定列表内容，也决定播放队列（切歌只在本分组内走）
+  // 当前筛选项，决定列表内容，也决定播放队列（切歌只在本播放列表内走）
   const albumFilter = ref<string>(FILTER_ALL)
-  // 多选后的曲目 id，供批量归入专辑
+  // 多选后的曲目 id，供批量归入播放列表
   const selectedIds = ref<string[]>([])
 
-  // 播放队列 = 当前筛选结果：专辑内播放不会串到别的专辑
+  // 播放队列 = 当前筛选结果：播放列表内切歌不会串到别的列表
   const visibleTracks = computed(() => {
     const filter = albumFilter.value
     if (filter === FILTER_ALL) return tracks.value
@@ -31,7 +31,7 @@ export const useLibraryStore = defineStore('library', () => {
     ])
     tracks.value = list
     albums.value = albumList
-    // 正在筛选的专辑可能已被删除，回退到「全部」避免空白列表
+    // 正在筛选的播放列表可能已被删除，回退到「全部歌曲」避免空白列表
     if (
       albumFilter.value !== FILTER_ALL &&
       albumFilter.value !== FILTER_NONE &&
@@ -71,7 +71,7 @@ export const useLibraryStore = defineStore('library', () => {
     albums.value = albumList
   }
 
-  // 单曲下拉与批量归入共用；albumId 为 null 表示移回未分类
+  // 单曲下拉与批量归入共用；albumId 为 null 表示未归入任何播放列表
   async function setAlbum(ids: string[], albumId: string | null): Promise<void> {
     if (ids.length === 0) return
     tracks.value = await window.api.setTrackAlbum(ids, albumId)
@@ -89,7 +89,7 @@ export const useLibraryStore = defineStore('library', () => {
     albums.value = await window.api.renameAlbum(id, name)
   }
 
-  // 删专辑只解除归属：曲目回到未分类，需要重拉列表
+  // 删播放列表只解除归属：曲目回到未分类，需要重拉列表
   async function deleteAlbum(id: string): Promise<void> {
     albums.value = await window.api.deleteAlbum(id)
     await refresh()

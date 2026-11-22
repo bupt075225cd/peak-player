@@ -45,7 +45,7 @@ onMounted(() => {
     <nav class="sidebar">
       <div class="logo">Peak Player</div>
       <button :class="{ active: currentView === 'library' }" @click="switchView('library')">
-        播放列表
+        资料库
       </button>
       <button :class="{ active: currentView === 'ranking' }" @click="switchView('ranking')">
         排行榜

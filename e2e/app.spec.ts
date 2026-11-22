@@ -25,7 +25,7 @@ test('冷启动：空库提示与窗口标题', async () => {
   const ctx = await launchApp()
   try {
     await expect(ctx.page).toHaveTitle('Peak Player')
-    await expect(ctx.page.getByRole('heading', { name: '播放列表' })).toBeVisible()
+    await expect(ctx.page.getByRole('heading', { name: '资料库' })).toBeVisible()
     await expect(ctx.page.locator('.empty')).toContainText('暂无歌曲')
     await expect(ctx.page.locator('.player-bar .title')).toHaveText('未在播放')
   } finally {
@@ -144,28 +144,29 @@ test('播放条：上一曲 / 下一曲按列表顺序切换', async () => {
   }
 })
 
-test('专辑：新建、批量归入后筛选，切歌只在该专辑内', async () => {
+test('播放列表：新建、批量归入后筛选，切歌只在该播放列表内', async () => {
   const ctx = await launchApp()
   try {
     await importFiles(ctx.app, ctx.page, [ctx.pathOf('tone.wav'), ctx.pathOf('short.wav')])
     await expect(rows(ctx.page)).toHaveCount(2)
 
-    // 新建专辑后，筛选下拉应该多出一项（全部 / 未分类 / 新专辑）
-    await ctx.page.getByPlaceholder('新专辑名称').fill('测试专辑')
-    await ctx.page.getByRole('button', { name: '新建专辑' }).click()
+    // 新建播放列表后，筛选下拉应该多出一项（全部歌曲 / 未分类 / 新列表）
+    await ctx.page.getByRole('button', { name: '新建播放列表' }).click()
+    await ctx.page.getByPlaceholder('新播放列表名称').fill('测试播放列表')
+    await ctx.page.getByRole('button', { name: '创建' }).click()
     await expect(ctx.page.locator('.album-filter select option')).toHaveCount(3)
 
-    // 勾选第一行并批量归入该专辑
+    // 勾选第一行并批量归入该播放列表
     await rows(ctx.page).nth(0).locator('input[type=checkbox]').check()
     await expect(ctx.page.locator('.batch-bar')).toContainText('已选 1 首')
     await ctx.page.locator('.batch-bar select').selectOption({ index: 1 })
     await expect(ctx.page.locator('.batch-bar')).toHaveCount(0)
 
-    // 筛选到该专辑：只剩归入的那一首
+    // 筛选到该播放列表：只剩归入的那一首
     await ctx.page.locator('.album-filter select').selectOption({ index: 2 })
     await expect(rows(ctx.page)).toHaveCount(1)
 
-    // 队列跟随筛选：专辑里只有一首，点下一曲仍停在这首
+    // 队列跟随筛选：列表里只有一首，点下一曲仍停在这首
     await playRow(ctx.page).click()
     const title = ((await playerBar(ctx.page).locator('.title').textContent()) ?? '').trim()
     await playerBar(ctx.page).getByRole('button', { name: '下一曲' }).click()

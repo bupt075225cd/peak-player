@@ -15,7 +15,7 @@ export interface Track {
   albumId: string | null
 }
 
-// 专辑：实体内置，便于重命名与后续扩展封面/排序
+// 播放列表（UI 术语）。数据层沿用 albums 表，便于重命名与后续扩展封面/排序
 export interface Album {
   id: string
   name: string

@@ -49,7 +49,7 @@ peak-player/
         ├── composables/      # 可单测的组件逻辑（歌词播放头/跟随滚动/进度拖动）
         ├── stores/           # Pinia 状态
         ├── utils/            # 展示格式化、图表整形、歌词定位（纯函数）
-        ├── views/            # 播放列表 / 排行榜 / 用时统计
+        ├── views/            # 资料库 / 排行榜 / 用时统计
         └── components/       # 播放控制条 / 歌词面板 / 全屏正在播放
 ```
 
@@ -135,7 +135,7 @@ npm run check:package
 - `src/renderer/src/composables/useLyricsPlayhead.test.ts` — 歌词 rAF 采样：播放/暂停/换源期跳过、启停幂等
 - `src/renderer/src/composables/useLyricFollow.test.ts` — 歌词自动跟随：居中滚动、手动浏览挂起、恢复与清理
 - `src/renderer/src/composables/useSeekDrag.test.ts` — 进度条拖动状态：拖动值、非法值收敛、松手才 seek
-- `src/renderer/src/stores/library.test.ts` — 播放列表 store
+- `src/renderer/src/stores/library.test.ts` — 资料库 store（曲目与播放列表）
 - `src/renderer/src/stores/lyrics.test.ts` — 歌词 store：切歌清空、过期结果丢弃、IPC 失败降级
 - `src/renderer/src/stores/stats.test.ts` — 统计 store
 

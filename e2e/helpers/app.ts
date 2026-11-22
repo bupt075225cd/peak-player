@@ -104,7 +104,7 @@ export function playRow(page: Page, index = 0) {
   return rows(page).nth(index).getByRole('button', { name: '播放' })
 }
 
-// 按列名定位，避免表格插入「专辑」列后列序号漂移
+// 按列名定位，避免表格插入「播放列表」列后列序号漂移
 export function playCountCell(page: Page, index = 0) {
   return rows(page).nth(index).locator('td.col-count')
 }
@@ -141,6 +141,6 @@ export async function selectRate(page: Page, rate: string): Promise<void> {
   await playerBar(page).locator('select').selectOption(rate)
 }
 
-export async function switchView(page: Page, name: '播放列表' | '排行榜' | '用时统计'): Promise<void> {
+export async function switchView(page: Page, name: '资料库' | '排行榜' | '用时统计'): Promise<void> {
   await page.locator('.sidebar').getByRole('button', { name }).click()
 }

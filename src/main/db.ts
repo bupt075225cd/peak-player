@@ -238,7 +238,7 @@ export function getRanking(by: RankingBy): Track[] {
     .all() as Track[]
 }
 
-// ---- 专辑 ----
+// ---- 播放列表（albums 表）----
 // 曲目数用子查询统计，渲染进程直接展示，不必再拉全表自己数
 export function listAlbums(): Album[] {
   return getDb()

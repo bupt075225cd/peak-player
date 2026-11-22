@@ -12,11 +12,14 @@ const library = useLibraryStore()
 const editingId = ref<string | null>(null)
 const editingValue = ref<string | number>('')
 
-// 新建 / 重命名专辑。渲染进程没有 prompt，输入都做成行内输入框
+// 新建 / 重命名播放列表（数据层实体仍是 albums 表）。渲染进程没有 prompt，
+// 输入都做成行内输入框。「新建播放列表」按钮本身始终可点，点开后才展开输入框——
+// 否则名称为空时会因 disabled 变成灰按钮，看起来像点不动
+const creating = ref(false)
 const albumName = ref('')
 const renaming = ref(false)
 const renameValue = ref('')
-// 批量归入的目标专辑：'' 表示还没选
+// 批量归入的目标播放列表：'' 表示还没选
 const batchTarget = ref('')
 
 // v-for 内的 template ref 会被收集为数组，这里用指令直接聚焦
@@ -27,7 +30,7 @@ const vFocus = {
   }
 }
 
-// 当前筛选到具体专辑时才显示重命名/删除入口
+// 当前筛选到具体播放列表时才显示重命名/删除入口
 const currentAlbum = computed<Album | null>(
   () => library.albums.find((a) => a.id === library.albumFilter) ?? null
 )
@@ -75,11 +78,22 @@ function setTrackAlbum(track: Track, e: Event): void {
   void library.setAlbum([track.id], value === '' ? null : value)
 }
 
+function startCreate(): void {
+  creating.value = true
+  albumName.value = ''
+}
+
+function cancelCreate(): void {
+  creating.value = false
+  albumName.value = ''
+}
+
 async function createAlbum(): Promise<void> {
   const name = albumName.value.trim()
   if (!name) return
   await library.createAlbum(name)
   albumName.value = ''
+  creating.value = false
 }
 
 function startRename(album: Album): void {
@@ -117,11 +131,11 @@ function toggleAll(): void {
 <template>
   <div class="view">
     <div class="toolbar">
-      <h2>播放列表</h2>
+      <h2>资料库</h2>
       <label class="album-filter">
-        专辑
+        播放列表
         <select :value="library.albumFilter" @change="setFilter">
-          <option :value="FILTER_ALL">全部（{{ library.tracks.length }}）</option>
+          <option :value="FILTER_ALL">全部歌曲（{{ library.tracks.length }}）</option>
           <option :value="FILTER_NONE">未分类</option>
           <option v-for="a in library.albums" :key="a.id" :value="a.id">
             {{ a.name }}（{{ a.trackCount }}）
@@ -134,14 +148,19 @@ function toggleAll(): void {
     </div>
 
     <div class="album-bar">
-      <input
-        v-model="albumName"
-        class="album-input"
-        type="text"
-        placeholder="新专辑名称"
-        @keyup.enter="createAlbum()"
-      />
-      <button class="small" :disabled="!albumName.trim()" @click="createAlbum()">新建专辑</button>
+      <template v-if="creating">
+        <input
+          v-focus
+          v-model="albumName"
+          class="album-input"
+          type="text"
+          placeholder="新播放列表名称"
+          @keyup.enter="createAlbum()"
+        />
+        <button class="small" :disabled="!albumName.trim()" @click="createAlbum()">创建</button>
+        <button class="small ghost" @click="cancelCreate()">取消</button>
+      </template>
+      <button v-else class="small" @click="startCreate()">新建播放列表</button>
 
       <template v-if="currentAlbum">
         <template v-if="renaming">
@@ -151,7 +170,7 @@ function toggleAll(): void {
         </template>
         <template v-else>
           <button class="small ghost" @click="startRename(currentAlbum)">重命名</button>
-          <button class="small ghost" @click="removeCurrentAlbum()">删除专辑</button>
+          <button class="small ghost" @click="removeCurrentAlbum()">删除播放列表</button>
         </template>
       </template>
     </div>
@@ -159,9 +178,9 @@ function toggleAll(): void {
     <div v-if="selectedCount" class="batch-bar">
       <span>已选 {{ selectedCount }} 首</span>
       <label>
-        归入
+        归入播放列表
         <select v-model="batchTarget" @change="applyBatchAlbum">
-          <option value="">选择专辑…</option>
+          <option value="">选择播放列表…</option>
           <option v-for="a in library.albums" :key="a.id" :value="a.id">{{ a.name }}</option>
           <option :value="FILTER_NONE">未分类</option>
         </select>
@@ -176,7 +195,7 @@ function toggleAll(): void {
             <input type="checkbox" :checked="allSelected" @change="toggleAll()" />
           </th>
           <th>标题</th>
-          <th>专辑</th>
+          <th>播放列表</th>
           <th>播放次数</th>
           <th>操作</th>
         </tr>
@@ -226,7 +245,7 @@ function toggleAll(): void {
     <p v-else class="empty">
       {{
         library.tracks.length
-          ? '该专辑下暂无歌曲，可通过「专辑」列或勾选后批量归入。'
+          ? '该播放列表下暂无歌曲，可通过「播放列表」列或勾选后批量归入。'
           : '暂无歌曲，点击右上角「导入音频文件」开始。'
       }}
     </p>
