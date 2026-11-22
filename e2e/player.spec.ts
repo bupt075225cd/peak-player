@@ -106,7 +106,7 @@ test('歌词：同名 .lrc 在播放条与全屏页展示，Esc 收起', async (
 
     await expect(playerBar(ctx.page).locator('.title-lyric')).toContainText('第一句')
 
-    await ctx.page.getByRole('button', { name: '歌词', exact: true }).click()
+    await ctx.page.getByRole('button', { name: '字幕', exact: true }).click()
     const overlay = ctx.page.locator('.now-playing')
     await expect(overlay).toBeVisible()
     await expect(overlay.locator('.lyric-line')).toHaveCount(2)
@@ -134,7 +134,7 @@ test('歌词页：手动滚动暂停跟随，拖动进度条联动高亮', async
 
     await importFiles(ctx.app, ctx.page, [ctx.pathOf('tone.wav')])
     await playRow(ctx.page).click()
-    await ctx.page.getByRole('button', { name: '歌词', exact: true }).click()
+    await ctx.page.getByRole('button', { name: '字幕', exact: true }).click()
 
     const overlay = ctx.page.locator('.now-playing')
     const viewport = overlay.locator('.lyrics-viewport')

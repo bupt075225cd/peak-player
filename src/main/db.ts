@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'node:path'
-import type { DailyUsage, RankingBy, Track } from '../shared/types'
+import type { Album, DailyUsage, RankingBy, Track } from '../shared/types'
 
 let db: Database.Database | undefined
 
@@ -33,6 +33,11 @@ export function initDb(dbPath?: string): void {
       date    TEXT PRIMARY KEY,
       seconds INTEGER NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS albums (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
   `)
 
   // 轻量迁移：老库补 duration 列（播放时采集，用于改次数时联动用时统计）
@@ -40,6 +45,12 @@ export function initDb(dbPath?: string): void {
   if (!columns.some((c) => c.name === 'duration')) {
     db.exec('ALTER TABLE tracks ADD COLUMN duration INTEGER NOT NULL DEFAULT 0')
   }
+  // 轻量迁移：老库补 album_id（NULL = 未分类）。不建外键，
+  // 专辑被删时由 deleteAlbum 主动把曲目置空，避免老库外键检查失败
+  if (!columns.some((c) => c.name === 'album_id')) {
+    db.exec('ALTER TABLE tracks ADD COLUMN album_id TEXT')
+  }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album_id)')
 }
 
 function getDb(): Database.Database {
@@ -56,15 +67,17 @@ export function addTracks(items: Track[]): number {
   const d = getDb()
   const exists = d.prepare('SELECT 1 FROM tracks WHERE path = ?')
   const stmt = d.prepare(`
-    INSERT OR IGNORE INTO tracks (id, title, path, source_type, play_count, total_seconds, duration)
-    VALUES (@id, @title, @path, @sourceType, @playCount, @totalSeconds, @duration)
+    INSERT OR IGNORE INTO tracks
+      (id, title, path, source_type, play_count, total_seconds, duration, album_id)
+    VALUES
+      (@id, @title, @path, @sourceType, @playCount, @totalSeconds, @duration, @albumId)
   `)
   const tx = d.transaction((rows: Track[]) => {
     let n = 0
     for (const r of rows) {
       // 同一次导入里也可能出现重复路径（对话框选重），所以在事务内逐条判定
       if (exists.get(r.path)) continue
-      n += stmt.run({ ...r, duration: r.duration ?? 0 }).changes
+      n += stmt.run({ ...r, duration: r.duration ?? 0, albumId: r.albumId ?? null }).changes
     }
     return n
   })
@@ -75,7 +88,8 @@ export function listTracks(): Track[] {
   return getDb()
     .prepare(`
       SELECT id, title, path, source_type AS sourceType,
-             play_count AS playCount, total_seconds AS totalSeconds, duration
+             play_count AS playCount, total_seconds AS totalSeconds, duration,
+             album_id AS albumId
       FROM tracks ORDER BY title ASC
     `)
     .all() as Track[]
@@ -85,7 +99,8 @@ export function getTrack(id: string): Track | undefined {
   return getDb()
     .prepare(`
       SELECT id, title, path, source_type AS sourceType,
-             play_count AS playCount, total_seconds AS totalSeconds, duration
+             play_count AS playCount, total_seconds AS totalSeconds, duration,
+             album_id AS albumId
       FROM tracks WHERE id = ?
     `)
     .get(id) as Track | undefined
@@ -213,11 +228,58 @@ export function getRanking(by: RankingBy): Track[] {
   return getDb()
     .prepare(`
       SELECT id, title, path, source_type AS sourceType,
-             play_count AS playCount, total_seconds AS totalSeconds, duration
+             play_count AS playCount, total_seconds AS totalSeconds, duration,
+             album_id AS albumId
       FROM tracks
       WHERE ${order} > 0
       ORDER BY ${order} DESC
       LIMIT 100
     `)
     .all() as Track[]
+}
+
+// ---- 专辑 ----
+// 曲目数用子查询统计，渲染进程直接展示，不必再拉全表自己数
+export function listAlbums(): Album[] {
+  return getDb()
+    .prepare(`
+      SELECT a.id AS id, a.name AS name,
+             (SELECT COUNT(*) FROM tracks t WHERE t.album_id = a.id) AS trackCount
+      FROM albums a
+      ORDER BY a.name ASC
+    `)
+    .all() as Album[]
+}
+
+export function createAlbum(id: string, name: string): void {
+  const trimmed = name.trim()
+  if (!trimmed) return
+  getDb()
+    .prepare('INSERT INTO albums (id, name, created_at) VALUES (?, ?, ?)')
+    .run(id, trimmed, Date.now())
+}
+
+export function renameAlbum(id: string, name: string): void {
+  const trimmed = name.trim()
+  if (!trimmed) return
+  getDb().prepare('UPDATE albums SET name = ? WHERE id = ?').run(trimmed, id)
+}
+
+// 删专辑只解除归属，曲目本身保留（与 deleteTrack 一致：不动用户数据）
+export function deleteAlbum(id: string): void {
+  const d = getDb()
+  d.transaction(() => {
+    d.prepare('UPDATE tracks SET album_id = NULL WHERE album_id = ?').run(id)
+    d.prepare('DELETE FROM albums WHERE id = ?').run(id)
+  })()
+}
+
+// 批量归属；albumId 为 null 表示移回未分类
+export function setTrackAlbum(ids: string[], albumId: string | null): void {
+  if (ids.length === 0) return
+  const d = getDb()
+  const stmt = d.prepare('UPDATE tracks SET album_id = ? WHERE id = ?')
+  d.transaction((list: string[]) => {
+    for (const id of list) stmt.run(albumId, id)
+  })(ids)
 }

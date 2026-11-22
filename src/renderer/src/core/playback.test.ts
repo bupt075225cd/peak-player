@@ -103,9 +103,10 @@ describe('endedAction', () => {
     expect(endedAction('single')).toBe('replay')
   })
 
-  it('顺序/列表循环交给外部', () => {
-    expect(endedAction('none')).toBe('stop')
-    expect(endedAction('all')).toBe('stop')
+  // 顺序与列表循环都请求下一首；区别在队列层（顺序模式到末尾返回 null 即停）
+  it('顺序/列表循环都交给队列切下一首', () => {
+    expect(endedAction('none')).toBe('next')
+    expect(endedAction('all')).toBe('next')
   })
 })
 

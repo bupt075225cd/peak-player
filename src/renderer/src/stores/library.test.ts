@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DailyUsage, Track } from '../../../shared/types'
+import type { Album, DailyUsage, Track } from '../../../shared/types'
 import { useLibraryStore } from './library'
 import { useStatsStore } from './stats'
 
@@ -13,6 +13,7 @@ function makeTrack(overrides: Partial<Track> = {}): Track {
     playCount: 0,
     totalSeconds: 0,
     duration: 200,
+    albumId: null,
     ...overrides
   }
 }
@@ -33,6 +34,26 @@ function setupApi(overrides: Record<string, unknown> = {}) {
     }),
     deleteTrack: vi.fn(async () => {
       calls.push('deleteTrack')
+    }),
+    listAlbums: vi.fn(async (): Promise<Album[]> => {
+      calls.push('listAlbums')
+      return []
+    }),
+    setTrackAlbum: vi.fn(async (): Promise<Track[]> => {
+      calls.push('setTrackAlbum')
+      return []
+    }),
+    createAlbum: vi.fn(async (): Promise<Album[]> => {
+      calls.push('createAlbum')
+      return []
+    }),
+    renameAlbum: vi.fn(async (): Promise<Album[]> => {
+      calls.push('renameAlbum')
+      return []
+    }),
+    deleteAlbum: vi.fn(async (): Promise<Album[]> => {
+      calls.push('deleteAlbum')
+      return []
     }),
     getWeeklyUsage: vi.fn(async (): Promise<DailyUsage[]> => {
       calls.push('getWeeklyUsage')
@@ -93,7 +114,8 @@ describe('library store', () => {
       'updateTrack',
       'getWeeklyUsage',
       'getRanking',
-      'listTracks'
+      'listTracks',
+      'listAlbums'
     ])
     expect(ctx.api.updateTrack).toHaveBeenCalledWith('1', { playCount: 5 })
   })
@@ -119,7 +141,105 @@ describe('library store', () => {
 
     expect(ctx.api.deleteTrack).toHaveBeenCalledWith('1')
     expect(library.tracks.map((t) => t.id)).toEqual(['2'])
-    expect(ctx.calls).toEqual(['deleteTrack', 'getRanking'])
+    // 排行榜与专辑曲目数都要跟着刷新
+    expect(ctx.calls).toEqual(['deleteTrack', 'getRanking', 'listAlbums'])
+  })
+
+  // 队列跟随筛选：列表范围变了，播放与上/下一首的作用范围也跟着变
+  it('visibleTracks 跟随专辑筛选', () => {
+    const library = useLibraryStore()
+    library.tracks = [
+      makeTrack({ id: '1', albumId: 'a1' }),
+      makeTrack({ id: '2', albumId: 'a2' }),
+      makeTrack({ id: '3', albumId: null })
+    ]
+
+    expect(library.visibleTracks.map((t) => t.id)).toEqual(['1', '2', '3'])
+
+    library.albumFilter = 'a1'
+    expect(library.visibleTracks.map((t) => t.id)).toEqual(['1'])
+
+    library.albumFilter = 'none'
+    expect(library.visibleTracks.map((t) => t.id)).toEqual(['3'])
+  })
+
+  it('setAlbum 批量归入后清空多选并回写列表', async () => {
+    const library = useLibraryStore()
+    library.selectedIds = ['1', '2']
+    ctx.api.setTrackAlbum.mockResolvedValueOnce([makeTrack({ id: '1', albumId: 'a1' })])
+
+    await library.setAlbum(['1', '2'], 'a1')
+
+    expect(ctx.api.setTrackAlbum).toHaveBeenCalledWith(['1', '2'], 'a1')
+    expect(library.selectedIds).toEqual([])
+    expect(library.tracks.map((t) => t.id)).toEqual(['1'])
+  })
+
+  // 专辑被删后筛选值不能再指向不存在的 id，否则列表会永远为空
+  it('refresh 会在筛选专辑已不存在时回退到全部', async () => {
+    const library = useLibraryStore()
+    library.albumFilter = 'gone'
+
+    await library.refresh()
+
+    expect(library.albumFilter).toBe('all')
+  })
+
+  it('createAlbum / renameAlbum 只更新专辑列表', async () => {
+    const library = useLibraryStore()
+    const album: Album = { id: 'a1', name: 'Jazz', trackCount: 0 }
+    ctx.api.createAlbum.mockResolvedValueOnce([album])
+    ctx.api.renameAlbum.mockResolvedValueOnce([{ ...album, name: 'Soul' }])
+
+    await library.createAlbum('Jazz')
+
+    expect(ctx.api.createAlbum).toHaveBeenCalledWith('Jazz')
+    expect(library.albums).toEqual([album])
+
+    await library.renameAlbum('a1', 'Soul')
+    expect(library.albums[0].name).toBe('Soul')
+  })
+
+  it('专辑名称为空白时不请求主进程', async () => {
+    const library = useLibraryStore()
+
+    await library.createAlbum('   ')
+    await library.renameAlbum('a1', '')
+
+    expect(ctx.api.createAlbum).not.toHaveBeenCalled()
+    expect(ctx.api.renameAlbum).not.toHaveBeenCalled()
+  })
+
+  // 删专辑只是解除归属，曲目要重新拉回来（albumId 已置空）
+  it('deleteAlbum 后重拉列表', async () => {
+    const library = useLibraryStore()
+    ctx.api.deleteAlbum.mockResolvedValueOnce([])
+    ctx.api.listTracks.mockResolvedValueOnce([makeTrack({ id: '1' })])
+
+    await library.deleteAlbum('a1')
+
+    expect(library.albums).toEqual([])
+    expect(library.tracks.map((t) => t.id)).toEqual(['1'])
+    expect(library.tracks[0].albumId).toBeNull()
+  })
+
+  // 全选只作用于当前筛选结果，否则批量归入会误伤别的专辑
+  it('全选与多选只覆盖当前筛选结果', () => {
+    const library = useLibraryStore()
+    library.tracks = [makeTrack({ id: '1', albumId: 'a1' }), makeTrack({ id: '2', albumId: 'a2' })]
+    library.albumFilter = 'a1'
+
+    library.selectAll()
+    expect(library.selectedIds).toEqual(['1'])
+
+    library.toggleSelect('1')
+    expect(library.selectedIds).toEqual([])
+
+    library.toggleSelect('1')
+    expect(library.selectedIds).toEqual(['1'])
+
+    library.clearSelection()
+    expect(library.selectedIds).toEqual([])
   })
 
   it('syncPlayCount 只改目标行，且保持对象引用不变', async () => {

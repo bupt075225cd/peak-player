@@ -16,7 +16,8 @@ const RANKED: Track[] = [
     sourceType: 'local',
     playCount: 5,
     totalSeconds: 300,
-    duration: 200
+    duration: 200,
+    albumId: null
   }
 ]
 

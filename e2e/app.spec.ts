@@ -45,16 +45,21 @@ test('安全面：只暴露白名单 api，渲染进程没有 Node 能力', asyn
 
     expect(surface.keys).toEqual([
       'addUsage',
+      'createAlbum',
+      'deleteAlbum',
       'deleteTrack',
       'getLyrics',
       'getRanking',
       'getWeeklyUsage',
       'importFiles',
       'incrementCount',
+      'listAlbums',
       'listTracks',
       'onTogglePlay',
       'onVariantProgress',
       'prepareVariant',
+      'renameAlbum',
+      'setTrackAlbum',
       'setTrackDuration',
       'updateTrack'
     ])
@@ -119,8 +124,12 @@ test('播放条：上一曲 / 下一曲按列表顺序切换', async () => {
     await expect(rows(ctx.page)).toHaveCount(2)
 
     // 列表顺序由 db 决定（按标题排序），这里直接取表格里的实际顺序
-    const first = ((await rows(ctx.page).nth(0).locator('td').nth(0).textContent()) ?? '').trim()
-    const second = ((await rows(ctx.page).nth(1).locator('td').nth(0).textContent()) ?? '').trim()
+    const first = (
+      (await rows(ctx.page).nth(0).locator('td.col-title').textContent()) ?? ''
+    ).trim()
+    const second = (
+      (await rows(ctx.page).nth(1).locator('td.col-title').textContent()) ?? ''
+    ).trim()
 
     await playRow(ctx.page, 0).click()
     await expect(playerBar(ctx.page).locator('.title')).toHaveText(first)
@@ -130,6 +139,37 @@ test('播放条：上一曲 / 下一曲按列表顺序切换', async () => {
 
     await playerBar(ctx.page).getByRole('button', { name: '上一曲' }).click()
     await expect(playerBar(ctx.page).locator('.title')).toHaveText(first)
+  } finally {
+    await ctx.close()
+  }
+})
+
+test('专辑：新建、批量归入后筛选，切歌只在该专辑内', async () => {
+  const ctx = await launchApp()
+  try {
+    await importFiles(ctx.app, ctx.page, [ctx.pathOf('tone.wav'), ctx.pathOf('short.wav')])
+    await expect(rows(ctx.page)).toHaveCount(2)
+
+    // 新建专辑后，筛选下拉应该多出一项（全部 / 未分类 / 新专辑）
+    await ctx.page.getByPlaceholder('新专辑名称').fill('测试专辑')
+    await ctx.page.getByRole('button', { name: '新建专辑' }).click()
+    await expect(ctx.page.locator('.album-filter select option')).toHaveCount(3)
+
+    // 勾选第一行并批量归入该专辑
+    await rows(ctx.page).nth(0).locator('input[type=checkbox]').check()
+    await expect(ctx.page.locator('.batch-bar')).toContainText('已选 1 首')
+    await ctx.page.locator('.batch-bar select').selectOption({ index: 1 })
+    await expect(ctx.page.locator('.batch-bar')).toHaveCount(0)
+
+    // 筛选到该专辑：只剩归入的那一首
+    await ctx.page.locator('.album-filter select').selectOption({ index: 2 })
+    await expect(rows(ctx.page)).toHaveCount(1)
+
+    // 队列跟随筛选：专辑里只有一首，点下一曲仍停在这首
+    await playRow(ctx.page).click()
+    const title = ((await playerBar(ctx.page).locator('.title').textContent()) ?? '').trim()
+    await playerBar(ctx.page).getByRole('button', { name: '下一曲' }).click()
+    await expect(playerBar(ctx.page).locator('.title')).toHaveText(title)
   } finally {
     await ctx.close()
   }

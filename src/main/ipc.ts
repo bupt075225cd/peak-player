@@ -2,6 +2,7 @@ import { dialog, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
 import type {
+  Album,
   DailyUsage,
   LyricDoc,
   RankingBy,
@@ -14,12 +15,17 @@ import {
   addTrackSeconds,
   addTracks,
   addUsage,
+  createAlbum,
+  deleteAlbum,
   deleteTrack,
   getRanking,
   getTrack,
   getWeeklyUsage,
   incrementCount,
+  listAlbums,
   listTracks,
+  renameAlbum,
+  setTrackAlbum,
   setTrackDuration,
   updateTrack
 } from './db'
@@ -40,6 +46,12 @@ export interface IpcDeps {
   getTrack: (id: string) => Track | undefined
   // 只删库记录，不动磁盘文件
   deleteTrack: (id: string) => void
+  listAlbums: () => Album[]
+  createAlbum: (id: string, name: string) => void
+  renameAlbum: (id: string, name: string) => void
+  deleteAlbum: (id: string) => void
+  // 批量归属；albumId 为 null 表示移回未分类
+  setTrackAlbum: (ids: string[], albumId: string | null) => void
   updateTrack: (id: string, patch: Partial<Pick<Track, 'playCount'>>) => void
   incrementCount: (id: string, delta: number) => number
   setTrackDuration: (id: string, seconds: number) => void
@@ -78,7 +90,8 @@ export function createIpcHandlers(deps: IpcDeps): IpcHandlers {
     sourceType: 'local',
     playCount: 0,
     totalSeconds: 0,
-    duration: 0
+    duration: 0,
+    albumId: null
   })
 
   return {
@@ -94,6 +107,31 @@ export function createIpcHandlers(deps: IpcDeps): IpcHandlers {
 
     // 只删库记录，磁盘上的音频与歌词文件保留
     'tracks:delete': (_e: IpcEvent, id: string): void => deps.deleteTrack(id),
+
+    // 单曲下拉与批量归入共用；albumId 为 null 表示移回未分类。
+    // 直接返回最新列表，渲染层替换即可，不必再发一次 list
+    'tracks:set-album': (_e: IpcEvent, ids: string[], albumId: string | null): Track[] => {
+      deps.setTrackAlbum(ids, albumId)
+      return deps.listTracks()
+    },
+
+    'albums:list': (): Album[] => deps.listAlbums(),
+
+    'albums:create': (_e: IpcEvent, name: string): Album[] => {
+      deps.createAlbum(deps.newId(), name)
+      return deps.listAlbums()
+    },
+
+    'albums:rename': (_e: IpcEvent, id: string, name: string): Album[] => {
+      deps.renameAlbum(id, name)
+      return deps.listAlbums()
+    },
+
+    // 删专辑只解除归属，曲目保留
+    'albums:delete': (_e: IpcEvent, id: string): Album[] => {
+      deps.deleteAlbum(id)
+      return deps.listAlbums()
+    },
 
     // 改次数会按「曲目真实时长 × 次数差」换算用时统计；
     // 从未播放过（或升级前入库）的曲目 duration 为 0，先补采一次再换算
@@ -154,6 +192,11 @@ export function createIpcDeps(): IpcDeps {
     addTracks,
     getTrack,
     deleteTrack,
+    listAlbums,
+    createAlbum,
+    renameAlbum,
+    deleteAlbum,
+    setTrackAlbum,
     updateTrack,
     incrementCount,
     setTrackDuration,

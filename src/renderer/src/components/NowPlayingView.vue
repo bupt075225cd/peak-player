@@ -14,8 +14,8 @@ const emit = defineEmits<{ close: [] }>()
 const lyrics = useLyricsStore()
 const library = useLibraryStore()
 
-// 空列表时没有可切的目标，按钮直接禁用
-const canSwitch = computed(() => library.tracks.length > 0)
+// 当前筛选结果为空时没有可切的目标，按钮直接禁用
+const canSwitch = computed(() => library.visibleTracks.length > 0)
 
 // 拖动状态与「松手才 seek」的逻辑在 composable 里，单测覆盖
 const drag = useSeekDrag({

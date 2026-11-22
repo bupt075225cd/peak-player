@@ -14,8 +14,8 @@ const library = useLibraryStore()
 
 const title = computed(() => playerState.current?.title ?? '未在播放')
 const loopLabel = computed(() => LOOP_LABELS[playerState.loopMode])
-// 空列表时没有可切的目标，按钮直接禁用，避免点了没反应
-const canSwitch = computed(() => library.tracks.length > 0)
+// 当前筛选结果为空时没有可切的目标，按钮直接禁用，避免点了没反应
+const canSwitch = computed(() => library.visibleTracks.length > 0)
 // 播放条只需要 4Hz 的 currentTime，全屏歌词页才用 rAF 取精确进度
 const currentLyric = computed(() => currentLyricText(lyrics.lines, playerState.currentTime))
 
@@ -59,6 +59,6 @@ const fmt = formatClock
       {{ playerState.error }}
     </span>
     <div class="time">{{ fmt(playerState.currentTime) }} / {{ fmt(playerState.duration) }}</div>
-    <button class="ghost lyric-toggle" @click="emit('openNowPlaying')">歌词</button>
+    <button class="ghost lyric-toggle" @click="emit('openNowPlaying')">字幕</button>
   </div>
 </template>

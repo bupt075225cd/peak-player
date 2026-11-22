@@ -92,6 +92,8 @@ export interface PlayerDeps {
   state: PlayerState
   // 播放结束后同步列表里的次数，避免整表重查
   syncPlayCount?: (id: string, count: number) => void
+  // 顺序/列表循环下自动切下一首；缺省时结束就停住
+  playNext?: () => void | Promise<void>
   resolveUrl?: (track: Track) => string
   timers?: PlayerTimers
   intervalMs?: number
@@ -351,8 +353,10 @@ export class PlayerEngine {
     if (endedAction(this.loopMode) === 'replay') {
       this.audio.currentTime = 0
       void this.safePlay()
+      return
     }
-    // 'all' 模式由外部队列处理切歌；'none' 模式自然停止
+    // 顺序 / 列表循环交给外部队列：顺序模式在列表末尾停下，列表循环回绕
+    void this.deps.playNext?.()
   }
 
   private beginTimer(): void {

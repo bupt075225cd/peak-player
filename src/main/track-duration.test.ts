@@ -11,6 +11,7 @@ function makeTrack(overrides: Partial<Track> = {}): Track {
     playCount: 0,
     totalSeconds: 0,
     duration: 0,
+    albumId: null,
     ...overrides
   }
 }

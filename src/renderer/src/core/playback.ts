@@ -65,7 +65,8 @@ export function elapsedSeconds(startTime: number, now: number): number {
   return seconds > 0 ? seconds : 0
 }
 
-// `ended` 之后做什么：单曲循环重播，其余情况交给外部（'all' 切歌 / 'none' 停止）
-export function endedAction(loopMode: LoopMode): 'replay' | 'stop' {
-  return loopMode === 'single' ? 'replay' : 'stop'
+// `ended` 之后做什么：单曲循环重播；顺序与列表循环都交给队列切下一首。
+// 两者的差别在队列层：顺序模式播到末尾就停，列表循环回绕到第一首。
+export function endedAction(loopMode: LoopMode): 'replay' | 'next' {
+  return loopMode === 'single' ? 'replay' : 'next'
 }

@@ -62,6 +62,7 @@ export function makeTrack(overrides: Partial<import('../../src/shared/types').Tr
     playCount: 0,
     totalSeconds: 0,
     duration: 0,
+    albumId: null,
     ...overrides
   }
 }

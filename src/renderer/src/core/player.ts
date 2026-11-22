@@ -21,15 +21,24 @@ export const player = new PlayerEngine({
   audio: new Audio() as unknown as AudioLike,
   api: window.api,
   state: playerState,
-  syncPlayCount: (id, count) => useLibraryStore().syncPlayCount(id, count)
+  syncPlayCount: (id, count) => useLibraryStore().syncPlayCount(id, count),
+  // 播完一首自动续播：顺序模式到末尾停下，列表循环才回绕
+  playNext: () => autoNext()
 })
 
-// 上/下一首：按播放列表顺序切换，首尾相接；未在播放时从头/尾开始。
+// 队列跟随播放列表的当前筛选结果：在专辑 / 未分类范围内切歌，不会串到别的分组。
 // 队列顺序由 library store 决定，引擎只负责加载与播放。
-function playNeighbor(dir: 1 | -1): Promise<void> {
-  const target = neighborTrack(useLibraryStore().tracks, playerState.current?.id, dir)
+function playNeighbor(dir: 1 | -1, opts: { wrap?: boolean } = {}): Promise<void> {
+  const { visibleTracks } = useLibraryStore()
+  const target = neighborTrack(visibleTracks, playerState.current?.id, dir, opts)
   return target === null ? Promise.resolve() : player.play(target)
 }
 
+// 手动点按钮：始终首尾相接
 export const nextTrack = (): Promise<void> => playNeighbor(1)
 export const prevTrack = (): Promise<void> => playNeighbor(-1)
+
+// 自动续播：只有列表循环才回绕，顺序模式到末尾返回 null 即停
+export function autoNext(): Promise<void> {
+  return playNeighbor(1, { wrap: playerState.loopMode === 'all' })
+}

@@ -8,15 +8,20 @@ import {
   addTracks,
   addTrackSeconds,
   addUsage,
+  createAlbum,
+  deleteAlbum,
   deleteTrack,
   getRanking,
   getTrack,
   getWeeklyUsage,
   incrementCount,
   initDb,
+  listAlbums,
   listTracks,
   localDate,
+  renameAlbum,
   setPlayCount,
+  setTrackAlbum,
   setTrackDuration,
   updateTrack
 } from './db'
@@ -32,6 +37,7 @@ function makeTrack(overrides: Partial<Track>): Track {
     playCount: 0,
     totalSeconds: 0,
     duration: 0,
+    albumId: null,
     ...overrides
   }
 }
@@ -300,6 +306,8 @@ describe('initDb 迁移', () => {
     expect(migrated?.playCount).toBe(2)
     expect(migrated?.totalSeconds).toBe(60)
     expect(migrated?.duration).toBe(0)
+    // 老库没有专辑概念，升级后一律视为未分类
+    expect(migrated?.albumId).toBeNull()
 
     // 新列可正常写入
     setTrackDuration('legacy', 33)
@@ -308,5 +316,78 @@ describe('initDb 迁移', () => {
     // 先切回内存库释放文件句柄，否则 Windows 上目录删不掉
     initDb(':memory:')
     rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('专辑', () => {
+  it('新建后按名称排序，曲目数从 0 开始', () => {
+    createAlbum('a1', 'Jazz')
+    createAlbum('a2', 'Acoustic')
+
+    expect(listAlbums()).toEqual([
+      { id: 'a2', name: 'Acoustic', trackCount: 0 },
+      { id: 'a1', name: 'Jazz', trackCount: 0 }
+    ])
+  })
+
+  it('名称为空白时不建专辑', () => {
+    createAlbum('a1', '   ')
+    expect(listAlbums()).toEqual([])
+  })
+
+  it('重命名为空白时保持原名', () => {
+    createAlbum('a1', 'Jazz')
+    renameAlbum('a1', '  ')
+    expect(listAlbums()[0].name).toBe('Jazz')
+  })
+
+  it('空 id 列表不报错', () => {
+    setTrackAlbum([], null)
+    expect(listTracks()).toHaveLength(0)
+  })
+
+  it('批量归属后专辑曲目数随之变化', () => {
+    createAlbum('a1', 'Jazz')
+    addTracks([
+      makeTrack({ id: '1' }),
+      makeTrack({ id: '2' }),
+      makeTrack({ id: '3' })
+    ])
+
+    setTrackAlbum(['1', '2'], 'a1')
+
+    expect(listAlbums()[0].trackCount).toBe(2)
+    expect(listTracks().filter((t) => t.albumId === 'a1').map((t) => t.id).sort()).toEqual([
+      '1',
+      '2'
+    ])
+
+    // 单曲移回未分类：同一接口，albumId 传 null
+    setTrackAlbum(['1'], null)
+    expect(getTrack('1')?.albumId).toBeNull()
+    expect(listAlbums()[0].trackCount).toBe(1)
+  })
+
+  it('重命名专辑不影响曲目归属', () => {
+    createAlbum('a1', 'Jazz')
+    addTracks([makeTrack({ id: '1' })])
+    setTrackAlbum(['1'], 'a1')
+
+    renameAlbum('a1', '  Soul  ')
+
+    expect(listAlbums()[0]).toEqual({ id: 'a1', name: 'Soul', trackCount: 1 })
+    expect(getTrack('1')?.albumId).toBe('a1')
+  })
+
+  it('删除专辑把曲目退回未分类，曲目本身保留', () => {
+    createAlbum('a1', 'Jazz')
+    addTracks([makeTrack({ id: '1' })])
+    setTrackAlbum(['1'], 'a1')
+
+    deleteAlbum('a1')
+
+    expect(listAlbums()).toEqual([])
+    expect(getTrack('1')?.albumId).toBeNull()
+    expect(listTracks()).toHaveLength(1)
   })
 })

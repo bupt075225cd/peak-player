@@ -11,6 +11,16 @@ export interface Track {
   totalSeconds: number
   // 曲目真实时长（秒），播放时采集；改次数时按它换算用时
   duration: number
+  // 所属专辑；null 表示未分类
+  albumId: string | null
+}
+
+// 专辑：实体内置，便于重命名与后续扩展封面/排序
+export interface Album {
+  id: string
+  name: string
+  // 专辑内曲目数，列表页直接展示，避免渲染进程二次统计
+  trackCount: number
 }
 
 export interface DailyUsage {

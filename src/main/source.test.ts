@@ -35,7 +35,8 @@ describe('createSource', () => {
       sourceType: 'local',
       playCount: 0,
       totalSeconds: 0,
-      duration: 0
+      duration: 0,
+      albumId: null
     }
     expect(createSource(t)).toBeInstanceOf(LocalSource)
   })
@@ -48,7 +49,8 @@ describe('createSource', () => {
       sourceType: 'remote',
       playCount: 0,
       totalSeconds: 0,
-      duration: 0
+      duration: 0,
+      albumId: null
     }
     expect(createSource(t)).toBeInstanceOf(RemoteSource)
   })

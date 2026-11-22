@@ -10,7 +10,8 @@ function track(id: string): Track {
     sourceType: 'local',
     playCount: 0,
     totalSeconds: 0,
-    duration: 100
+    duration: 100,
+    albumId: null
   }
 }
 
@@ -32,6 +33,13 @@ describe('neighborTrack', () => {
   it('首尾相接：最后一首往后回到第一首，第一首往前到最后一首', () => {
     expect(ids(neighborTrack(list, 'c', 1))).toBe('a')
     expect(ids(neighborTrack(list, 'a', -1))).toBe('c')
+  })
+
+  // 自动续播：顺序模式到列表末尾返回 null（停住），列表循环才回绕
+  it('wrap: false 时到边界返回 null', () => {
+    expect(neighborTrack(list, 'c', 1, { wrap: false })).toBeNull()
+    expect(neighborTrack(list, 'a', -1, { wrap: false })).toBeNull()
+    expect(ids(neighborTrack(list, 'a', 1, { wrap: false }))).toBe('b')
   })
 
   it('单曲列表返回自己', () => {

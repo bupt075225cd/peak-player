@@ -104,8 +104,9 @@ export function playRow(page: Page, index = 0) {
   return rows(page).nth(index).getByRole('button', { name: '播放' })
 }
 
+// 按列名定位，避免表格插入「专辑」列后列序号漂移
 export function playCountCell(page: Page, index = 0) {
-  return rows(page).nth(index).locator('td').nth(1)
+  return rows(page).nth(index).locator('td.col-count')
 }
 
 export function playerBar(page: Page) {

@@ -19,7 +19,7 @@ describe('PlayerEngine', () => {
 
   // 每次都新建 audio/api：同一假 Audio 上挂两个引擎会让旧实例的 play 事件
   // 重置计时起点，测出来的用时是错的（正是这里踩过的坑）
-  function build(overrides: { intervalMs?: number } = {}): void {
+  function build(overrides: { intervalMs?: number; playNext?: () => void } = {}): void {
     audio = new FakeAudio()
     api = createFakeApi()
     state = createInitialPlayerState()
@@ -29,6 +29,7 @@ describe('PlayerEngine', () => {
       api,
       state,
       syncPlayCount,
+      playNext: overrides.playNext,
       intervalMs: overrides.intervalMs
     })
   }
@@ -283,16 +284,27 @@ describe('PlayerEngine', () => {
       expect(audio.playCalls).toBe(playCallsBefore)
     })
 
-    it('列表循环（all）当前不会自动切歌，作为回归护栏', async () => {
+    // 自动续播交给队列：引擎只发信号，是否回绕由队列按 loopMode 决定
+    it('列表循环：结束后请求队列切下一首', async () => {
+      const playNext = vi.fn()
+      build({ playNext })
       engine.loopMode = 'all'
       await engine.play(makeTrack())
-      const playCallsBefore = audio.playCalls
 
       audio.emit('ended')
       await vi.waitFor(() => expect(api.calls.incrementCount).toHaveLength(1))
 
-      expect(audio.playCalls).toBe(playCallsBefore)
-      expect(state.current?.id).toBe('t1')
+      expect(playNext).toHaveBeenCalledTimes(1)
+    })
+
+    it('顺序播放：结束后同样请求队列（末尾停下由队列判断）', async () => {
+      const playNext = vi.fn()
+      build({ playNext })
+      engine.loopMode = 'none'
+      await engine.play(makeTrack())
+
+      audio.emit('ended')
+      await vi.waitFor(() => expect(playNext).toHaveBeenCalledTimes(1))
     })
 
     it('结束前切换了曲目时，旧曲目的计数结果不写回当前曲目', async () => {

@@ -27,6 +27,11 @@ function makeDeps(overrides: Partial<IpcDeps> = {}): IpcDeps {
     addTracks: () => 0,
     getTrack: () => undefined,
     deleteTrack: () => {},
+    listAlbums: () => [],
+    createAlbum: () => {},
+    renameAlbum: () => {},
+    deleteAlbum: () => {},
+    setTrackAlbum: () => {},
     updateTrack: () => {},
     incrementCount: () => 0,
     setTrackDuration: () => {},
@@ -48,6 +53,10 @@ describe('IPC 通道集合', () => {
     const handlers = createIpcHandlers(makeDeps())
     expect(Object.keys(handlers).sort()).toEqual(
       [
+        'albums:create',
+        'albums:delete',
+        'albums:list',
+        'albums:rename',
         'audio:variant',
         'lyrics:get',
         'stats:ranking',
@@ -56,6 +65,7 @@ describe('IPC 通道集合', () => {
         'tracks:import',
         'tracks:increment',
         'tracks:list',
+        'tracks:set-album',
         'tracks:update',
         'usage:add',
         'usage:weekly'

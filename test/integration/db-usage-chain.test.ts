@@ -1,17 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Track } from '../../src/shared/types'
+import type { Album, Track } from '../../src/shared/types'
 import {
   addTrackSeconds,
   addTracks,
   addUsage,
+  createAlbum,
+  deleteAlbum,
   deleteTrack,
   getRanking,
   getTrack,
   getWeeklyUsage,
   incrementCount,
   initDb,
+  listAlbums,
   listTracks,
   localDate,
+  renameAlbum,
+  setTrackAlbum,
   setTrackDuration,
   updateTrack
 } from '../../src/main/db'
@@ -48,6 +53,7 @@ function track(overrides: Partial<Track> = {}): Track {
     playCount: 0,
     totalSeconds: 0,
     duration: 0,
+    albumId: null,
     ...overrides
   }
 }
@@ -65,6 +71,11 @@ function buildHandlers(
     addTracks,
     getTrack,
     deleteTrack,
+    listAlbums,
+    createAlbum,
+    renameAlbum,
+    deleteAlbum,
+    setTrackAlbum,
     updateTrack,
     incrementCount,
     setTrackDuration,
@@ -294,5 +305,55 @@ describe('真实 ffmpeg 探测时长', () => {
       else process.env['PEAK_FFMPEG'] = previous
       dir.cleanup()
     }
+  })
+})
+
+// 专辑走完整链路：IPC handler → 真实 db → 再经 handler 读回
+describe('专辑链路（真实文件库）', () => {
+  let tmp: TempDir
+
+  beforeEach(() => {
+    tmp = makeTempDir('albumchain-')
+    initDb(tmp.file('peak.db'))
+  })
+
+  afterEach(() => {
+    tmp.cleanup()
+  })
+
+  it('创建 → 批量归入 → 重命名 → 删除后曲目回到未分类', async () => {
+    addTracks([track({ id: 't1' }), track({ id: 't2' })])
+    const { handlers } = buildHandlers()
+
+    const created = (await handlers['albums:create']!(event, 'Jazz')) as Album[]
+    expect(created).toHaveLength(1)
+    const albumId = created[0].id
+
+    const assigned = (await handlers['tracks:set-album']!(
+      event,
+      ['t1', 't2'],
+      albumId
+    )) as Track[]
+    expect(assigned.every((t) => t.albumId === albumId)).toBe(true)
+
+    const listed = (await handlers['albums:list']!(event)) as Album[]
+    expect(listed[0].trackCount).toBe(2)
+
+    const renamed = (await handlers['albums:rename']!(event, albumId, 'Soul')) as Album[]
+    expect(renamed[0].name).toBe('Soul')
+
+    await handlers['albums:delete']!(event, albumId)
+    expect(getTrack('t1')?.albumId).toBeNull()
+  })
+
+  it('set-album 传 null 把曲目移回未分类', async () => {
+    addTracks([track({ id: 't1' })])
+    const { handlers } = buildHandlers()
+
+    const created = (await handlers['albums:create']!(event, 'Jazz')) as Album[]
+    await handlers['tracks:set-album']!(event, ['t1'], created[0].id)
+
+    const back = (await handlers['tracks:set-album']!(event, ['t1'], null)) as Track[]
+    expect(back[0].albumId).toBeNull()
   })
 })

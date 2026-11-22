@@ -77,7 +77,8 @@ beforeEach(() => {
     sourceType: 'local',
     playCount: 0,
     totalSeconds: 0,
-    duration: 200
+    duration: 200,
+    albumId: null
   }
   seek.mockClear()
   setRate.mockClear()
@@ -149,7 +150,8 @@ describe('NowPlayingView', () => {
         sourceType: 'local',
         playCount: 0,
         totalSeconds: 0,
-        duration: 10
+        duration: 10,
+        albumId: null
       }
     ]
     await nextTick()
