@@ -207,6 +207,56 @@ tbody tr:hover {
   margin-top: 24px;
 }
 
+/* ---- 影子跟读指南 ---- */
+.shadowing-intro {
+  max-width: 720px;
+  margin-bottom: 16px;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
+.shadowing-steps {
+  max-width: 720px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shadowing-steps > li {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-panel);
+}
+
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.step-no {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+}
+
+.step-points {
+  margin: 10px 0 0 32px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
 .ranking {
   list-style: none;
 }

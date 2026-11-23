@@ -8,9 +8,10 @@ import { useLyricsStore } from './stores/lyrics'
 import { useStatsStore } from './stores/stats'
 import LibraryView from './views/LibraryView.vue'
 import RankingView from './views/RankingView.vue'
+import ShadowingView from './views/ShadowingView.vue'
 import StatsView from './views/StatsView.vue'
 
-type ViewKey = 'library' | 'ranking' | 'stats'
+type ViewKey = 'library' | 'shadowing' | 'ranking' | 'stats'
 
 const library = useLibraryStore()
 const stats = useStatsStore()
@@ -47,6 +48,9 @@ onMounted(() => {
       <button :class="{ active: currentView === 'library' }" @click="switchView('library')">
         资料库
       </button>
+      <button :class="{ active: currentView === 'shadowing' }" @click="switchView('shadowing')">
+        影子跟读
+      </button>
       <button :class="{ active: currentView === 'ranking' }" @click="switchView('ranking')">
         排行榜
       </button>
@@ -56,6 +60,7 @@ onMounted(() => {
     </nav>
     <main class="content">
       <LibraryView v-if="currentView === 'library'" />
+      <ShadowingView v-else-if="currentView === 'shadowing'" />
       <RankingView v-else-if="currentView === 'ranking'" />
       <StatsView v-else />
     </main>

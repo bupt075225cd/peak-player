@@ -33,6 +33,19 @@ test('冷启动：空库提示与窗口标题', async () => {
   }
 })
 
+test('影子跟读：展示五步指南', async () => {
+  const ctx = await launchApp()
+  try {
+    await switchView(ctx.page, '影子跟读')
+    await expect(ctx.page.getByRole('heading', { name: '影子跟读指南' })).toBeVisible()
+    await expect(ctx.page.locator('.shadowing-steps > li')).toHaveCount(5)
+    // 纯展示：不带勾选控件
+    await expect(ctx.page.locator('.shadowing input')).toHaveCount(0)
+  } finally {
+    await ctx.close()
+  }
+})
+
 test('安全面：只暴露白名单 api，渲染进程没有 Node 能力', async () => {
   const ctx = await launchApp()
   try {

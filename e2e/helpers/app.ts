@@ -141,6 +141,9 @@ export async function selectRate(page: Page, rate: string): Promise<void> {
   await playerBar(page).locator('select').selectOption(rate)
 }
 
-export async function switchView(page: Page, name: '资料库' | '排行榜' | '用时统计'): Promise<void> {
+export async function switchView(
+  page: Page,
+  name: '资料库' | '影子跟读' | '排行榜' | '用时统计'
+): Promise<void> {
   await page.locator('.sidebar').getByRole('button', { name }).click()
 }
